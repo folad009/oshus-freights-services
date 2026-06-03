@@ -32,6 +32,7 @@ declare module "@auth/core/jwt" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
@@ -41,26 +42,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        try {
+          const user = await db.user.findUnique({
+            where: { email: credentials.email as string },
+          });
 
-        if (!user || user.status !== UserStatus.ACTIVE) return null;
+          if (!user || user.status !== UserStatus.ACTIVE) return null;
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
-        if (!valid) return null;
+          const valid = await bcrypt.compare(
+            credentials.password as string,
+            user.passwordHash
+          );
+          if (!valid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          name: `${user.firstName} ${user.lastName}`,
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            name: `${user.firstName} ${user.lastName}`,
+          };
+        } catch (error) {
+          console.error("[auth] credentials authorize failed:", error);
+          return null;
+        }
       },
     }),
   ],

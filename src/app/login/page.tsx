@@ -36,7 +36,11 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        toast.error("Invalid email or password");
+        const message =
+          result.error === "Configuration"
+            ? "Authentication is not configured on the server. Please contact support."
+            : "Invalid email or password";
+        toast.error(message);
         return;
       }
 
