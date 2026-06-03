@@ -1,0 +1,144 @@
+import { NextRequest } from "next/server";
+import { ShipmentStatus, UserRole } from "@/types/enums";
+import { db } from "@/lib/db";
+import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
+import { getAuthContext, AuthError } from "@/lib/api-auth";
+import { createShipmentSchema, updateShipmentSchema } from "@/lib/validations";
+import { createAuditLog, generateTrackingNumber, getCustomerIdForUser } from "@/lib/helpers";
+import { createInvoiceForShipment } from "@/lib/billing";
+import { notifyShipmentCreated } from "@/lib/notifications";
+import {
+  getWarehouseScope,
+  buildWarehouseIdFilter,
+  assertWarehouseAccess,
+  WarehouseAccessError,
+} from "@/lib/warehouse-scope";
+
+export async function GET(req: NextRequest) {
+  try {
+    const user = await getAuthContext("shipments:read");
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status") as ShipmentStatus | null;
+    const customerId = searchParams.get("customerId");
+    const warehouseId = searchParams.get("warehouseId");
+
+    const scope = await getWarehouseScope(user);
+    const warehouseFilter = buildWarehouseIdFilter(scope, warehouseId);
+
+    const where: Record<string, unknown> = { ...warehouseFilter };
+
+    if (status) where.status = status;
+
+    if (user.role === UserRole.CUSTOMER) {
+      const cid = await getCustomerIdForUser(user.id);
+      if (!cid) return successResponse([]);
+      where.customerId = cid;
+    } else if (customerId) {
+      where.customerId = customerId;
+    }
+
+    if (user.role === UserRole.DRIVER) {
+      const driver = await db.driver.findUnique({ where: { userId: user.id } });
+      if (!driver) return successResponse([]);
+      where.driverId = driver.id;
+    }
+
+    const shipments = await db.shipment.findMany({
+      where,
+      include: {
+        customer: { select: { companyName: true, contactPerson: true } },
+        driver: { include: { user: { select: { firstName: true, lastName: true } } } },
+        vehicle: { select: { plateNumber: true, type: true } },
+        dispatcher: { select: { firstName: true, lastName: true } },
+        warehouse: { select: { id: true, code: true, name: true } },
+        events: { orderBy: { timestamp: "desc" }, take: 1 },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return successResponse(shipments);
+  } catch (error) {
+    if (error instanceof AuthError) return errorResponse(error.message, error.status);
+    return handleApiError(error);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const user = await getAuthContext("shipments:write");
+    const body = await req.json();
+    const parsed = createShipmentSchema.safeParse(body);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message);
+
+    let customerId = parsed.data.customerId;
+    if (user.role === UserRole.CUSTOMER) {
+      customerId = (await getCustomerIdForUser(user.id)) ?? undefined;
+      if (!customerId) return errorResponse("Customer profile not found", 404);
+    }
+    if (!customerId) return errorResponse("Customer ID is required");
+
+    if (parsed.data.warehouseId) {
+      const warehouse = await db.warehouse.findUnique({
+        where: { id: parsed.data.warehouseId },
+      });
+      if (!warehouse) return errorResponse("Warehouse branch not found", 404);
+      if (user.role === UserRole.WAREHOUSE_STAFF) {
+        await assertWarehouseAccess(user, parsed.data.warehouseId);
+      }
+    }
+
+    const shipment = await db.shipment.create({
+      data: {
+        trackingNumber: generateTrackingNumber(),
+        customerId,
+        shipmentType: parsed.data.shipmentType,
+        weight: parsed.data.weight,
+        origin: parsed.data.origin,
+        destination: parsed.data.destination,
+        warehouseId: parsed.data.warehouseId,
+        scheduledPickup: parsed.data.scheduledPickup
+          ? new Date(parsed.data.scheduledPickup)
+          : undefined,
+        notes: parsed.data.notes,
+        events: {
+          create: {
+            eventType: ShipmentStatus.DRAFT,
+            location: parsed.data.origin,
+            notes: "Shipment created",
+          },
+        },
+      },
+      include: {
+        customer: { select: { companyName: true } },
+        warehouse: { select: { code: true, name: true } },
+      },
+    });
+
+    await createAuditLog({
+      userId: user.id,
+      action: "CREATE",
+      entity: "Shipment",
+      entityId: shipment.id,
+      details: `Created shipment ${shipment.trackingNumber}`,
+    });
+
+    await notifyShipmentCreated(shipment);
+
+    if (user.role === UserRole.CUSTOMER) {
+      await createInvoiceForShipment({
+        shipmentId: shipment.id,
+        customerId: shipment.customerId,
+        shipmentType: shipment.shipmentType,
+        weight: shipment.weight,
+        trackingNumber: shipment.trackingNumber,
+        userId: user.id,
+      });
+    }
+
+    return successResponse(shipment, 201);
+  } catch (error) {
+    if (error instanceof AuthError) return errorResponse(error.message, error.status);
+    if (error instanceof WarehouseAccessError) return errorResponse(error.message, 403);
+    return handleApiError(error);
+  }
+}
