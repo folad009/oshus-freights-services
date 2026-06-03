@@ -22,9 +22,11 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("password123", 12);
 
+  const demoUserUpdate = { passwordHash, status: UserStatus.ACTIVE };
+
   const admin = await db.user.upsert({
     where: { email: "admin@oshus.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "System",
       lastName: "Admin",
@@ -37,7 +39,7 @@ async function main() {
 
   const dispatcher = await db.user.upsert({
     where: { email: "dispatcher@oshus.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "James",
       lastName: "Wilson",
@@ -50,7 +52,7 @@ async function main() {
 
   const warehouseUser = await db.user.upsert({
     where: { email: "warehouse@oshus.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "Sarah",
       lastName: "Chen",
@@ -63,7 +65,7 @@ async function main() {
 
   const financeUser = await db.user.upsert({
     where: { email: "finance@oshus.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "Michael",
       lastName: "Brown",
@@ -76,7 +78,7 @@ async function main() {
 
   const driverUser = await db.user.upsert({
     where: { email: "driver@oshus.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "David",
       lastName: "Martinez",
@@ -89,7 +91,7 @@ async function main() {
 
   const customerUser = await db.user.upsert({
     where: { email: "customer@acme.com" },
-    update: {},
+    update: demoUserUpdate,
     create: {
       firstName: "John",
       lastName: "Acme",

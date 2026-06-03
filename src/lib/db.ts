@@ -1,11 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
-/** Bump when schema changes require a fresh client in local dev (HMR cache). */
-const PRISMA_SCHEMA_VERSION = 5;
-
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  prismaSchemaVersion?: number;
 };
 
 function createPrismaClient() {
@@ -14,21 +10,8 @@ function createPrismaClient() {
   });
 }
 
-function getPrismaClient() {
-  const cached = globalForPrisma.prisma;
-  const cacheValid =
-    cached &&
-    (process.env.NODE_ENV === "production" ||
-      globalForPrisma.prismaSchemaVersion === PRISMA_SCHEMA_VERSION);
+export const db = globalForPrisma.prisma ?? createPrismaClient();
 
-  if (cacheValid) return cached;
-
-  const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-    globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
-  }
-  return client;
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = db;
 }
-
-export const db = getPrismaClient();

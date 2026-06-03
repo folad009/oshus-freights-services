@@ -32,6 +32,7 @@ declare module "@auth/core/jwt" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
@@ -41,26 +42,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        const email = (credentials.email as string).trim().toLowerCase();
+        const password = credentials.password as string;
 
-        if (!user || user.status !== UserStatus.ACTIVE) return null;
+        try {
+          const user = await db.user.findUnique({ where: { email } });
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
-        if (!valid) return null;
+          if (!user) {
+            console.error("[auth] sign-in failed: user not found");
+            return null;
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          name: `${user.firstName} ${user.lastName}`,
-        };
+          if (user.status !== UserStatus.ACTIVE) {
+            console.error("[auth] sign-in failed: user inactive");
+            return null;
+          }
+
+          const valid = await bcrypt.compare(password, user.passwordHash);
+          if (!valid) {
+            console.error("[auth] sign-in failed: invalid password");
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            name: `${user.firstName} ${user.lastName}`,
+          };
+        } catch (error) {
+          console.error("[auth] sign-in failed: database error", error);
+          return null;
+        }
       },
     }),
   ],
