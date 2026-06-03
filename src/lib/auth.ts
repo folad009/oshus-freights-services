@@ -42,27 +42,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = (credentials.email as string).trim().toLowerCase();
-        const password = credentials.password as string;
-
         try {
-          const user = await db.user.findUnique({ where: { email } });
+          const user = await db.user.findUnique({
+            where: { email: credentials.email as string },
+          });
 
-          if (!user) {
-            console.error("[auth] sign-in failed: user not found");
-            return null;
-          }
+          if (!user || user.status !== UserStatus.ACTIVE) return null;
 
-          if (user.status !== UserStatus.ACTIVE) {
-            console.error("[auth] sign-in failed: user inactive");
-            return null;
-          }
-
-          const valid = await bcrypt.compare(password, user.passwordHash);
-          if (!valid) {
-            console.error("[auth] sign-in failed: invalid password");
-            return null;
-          }
+          const valid = await bcrypt.compare(
+            credentials.password as string,
+            user.passwordHash
+          );
+          if (!valid) return null;
 
           return {
             id: user.id,
@@ -73,7 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: `${user.firstName} ${user.lastName}`,
           };
         } catch (error) {
-          console.error("[auth] sign-in failed: database error", error);
+          console.error("[auth] credentials authorize failed:", error);
           return null;
         }
       },
