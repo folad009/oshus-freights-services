@@ -19,7 +19,7 @@ export async function GET(
       where: { id },
       include: {
         customer: { select: { id: true, companyName: true, userId: true } },
-        shipment: { select: { id: true, trackingNumber: true } },
+        shipment: { select: { id: true, trackingNumber: true, weight: true } },
         payments: true,
       },
     });

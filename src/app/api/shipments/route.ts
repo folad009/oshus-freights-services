@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { createShipmentSchema, updateShipmentSchema } from "@/lib/validations";
-import { createAuditLog, generateTrackingNumber, getCustomerIdForUser } from "@/lib/helpers";
+import { createAuditLog, generateTrackingNumber, getCustomerIdForUser, calculateCbm } from "@/lib/helpers";
 import { createInvoiceForShipment } from "@/lib/billing";
 import { notifyShipmentCreated } from "@/lib/notifications";
 import {
@@ -70,22 +70,31 @@ export async function POST(req: NextRequest) {
     const parsed = createShipmentSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message);
 
-    let customerId = parsed.data.customerId;
+    let customerId = parsed.data.customerId?.trim() || undefined;
     if (user.role === UserRole.CUSTOMER) {
       customerId = (await getCustomerIdForUser(user.id)) ?? undefined;
       if (!customerId) return errorResponse("Customer profile not found", 404);
     }
     if (!customerId) return errorResponse("Customer ID is required");
 
-    if (parsed.data.warehouseId) {
+    const warehouseId = parsed.data.warehouseId?.trim() || undefined;
+
+    if (warehouseId) {
       const warehouse = await db.warehouse.findUnique({
-        where: { id: parsed.data.warehouseId },
+        where: { id: warehouseId },
       });
       if (!warehouse) return errorResponse("Warehouse branch not found", 404);
       if (user.role === UserRole.WAREHOUSE_STAFF) {
-        await assertWarehouseAccess(user, parsed.data.warehouseId);
+        await assertWarehouseAccess(user, warehouseId);
       }
     }
+
+    const cbm = calculateCbm({
+      lengthCm: parsed.data.lengthCm,
+      widthCm: parsed.data.widthCm,
+      heightCm: parsed.data.heightCm,
+      packageCount: parsed.data.packageCount,
+    });
 
     const shipment = await db.shipment.create({
       data: {
@@ -93,9 +102,14 @@ export async function POST(req: NextRequest) {
         customerId,
         shipmentType: parsed.data.shipmentType,
         weight: parsed.data.weight,
+        lengthCm: parsed.data.lengthCm,
+        widthCm: parsed.data.widthCm,
+        heightCm: parsed.data.heightCm,
+        packageCount: parsed.data.packageCount ?? 1,
+        cbm,
         origin: parsed.data.origin,
         destination: parsed.data.destination,
-        warehouseId: parsed.data.warehouseId,
+        warehouseId: warehouseId ?? null,
         scheduledPickup: parsed.data.scheduledPickup
           ? new Date(parsed.data.scheduledPickup)
           : undefined,
@@ -122,7 +136,9 @@ export async function POST(req: NextRequest) {
       details: `Created shipment ${shipment.trackingNumber}`,
     });
 
-    await notifyShipmentCreated(shipment);
+    await notifyShipmentCreated(shipment).catch((error) => {
+      console.error("Failed to send shipment notifications:", error);
+    });
 
     if (user.role === UserRole.CUSTOMER) {
       await createInvoiceForShipment({

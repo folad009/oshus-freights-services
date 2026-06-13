@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { updateShipmentSchema } from "@/lib/validations";
-import { createAuditLog, getCustomerIdForUser } from "@/lib/helpers";
+import { createAuditLog, getCustomerIdForUser, calculateCbm } from "@/lib/helpers";
 import {
   notifyShipmentStatusChanged,
   notifyDriverAssigned,
@@ -75,6 +75,10 @@ export async function PATCH(
     const {
       shipmentType,
       weight,
+      lengthCm,
+      widthCm,
+      heightCm,
+      packageCount,
       origin,
       destination,
       status,
@@ -87,6 +91,32 @@ export async function PATCH(
       notes,
     } = parsed.data;
 
+    const mergedLength = lengthCm ?? existing.lengthCm;
+    const mergedWidth = widthCm ?? existing.widthCm;
+    const mergedHeight = heightCm ?? existing.heightCm;
+    const mergedPackageCount = packageCount ?? existing.packageCount;
+
+    const dimensionUpdate =
+      lengthCm !== undefined ||
+      widthCm !== undefined ||
+      heightCm !== undefined ||
+      packageCount !== undefined;
+
+    let cbm: number | undefined;
+    if (
+      dimensionUpdate &&
+      mergedLength != null &&
+      mergedWidth != null &&
+      mergedHeight != null
+    ) {
+      cbm = calculateCbm({
+        lengthCm: mergedLength,
+        widthCm: mergedWidth,
+        heightCm: mergedHeight,
+        packageCount: mergedPackageCount,
+      });
+    }
+
     const isAssigning =
       (driverId !== undefined && driverId !== existing.driverId) ||
       (vehicleId !== undefined && vehicleId !== existing.vehicleId) ||
@@ -95,6 +125,10 @@ export async function PATCH(
     const isUpdatingDetails =
       shipmentType !== undefined ||
       weight !== undefined ||
+      lengthCm !== undefined ||
+      widthCm !== undefined ||
+      heightCm !== undefined ||
+      packageCount !== undefined ||
       origin !== undefined ||
       destination !== undefined ||
       status !== undefined ||
@@ -141,6 +175,11 @@ export async function PATCH(
       data: {
         shipmentType,
         weight,
+        lengthCm,
+        widthCm,
+        heightCm,
+        packageCount,
+        cbm,
         origin,
         destination,
         status: resolvedStatus,

@@ -7,6 +7,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   DRIVER: "Driver",
   DISPATCHER: "Dispatcher",
   FINANCE_OFFICER: "Finance Officer",
+  MARKETING: "Marketing",
+  FRONT_DESK: "Front Desk",
 };
 
 export const ROLE_DASHBOARD_PATH: Record<UserRole, string> = {
@@ -16,6 +18,8 @@ export const ROLE_DASHBOARD_PATH: Record<UserRole, string> = {
   DRIVER: "/dashboard/driver",
   DISPATCHER: "/dashboard/dispatcher",
   FINANCE_OFFICER: "/dashboard/finance",
+  MARKETING: "/dashboard/marketing",
+  FRONT_DESK: "/dashboard/front-desk",
 };
 
 export type Permission =
@@ -76,7 +80,19 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "shipments:read",
     "invoices:read", "invoices:write",
     "payments:read", "payments:write",
-    "customers:read", "reports:read",
+    "customers:read",
+  ],
+  MARKETING: [
+    "shipments:read",
+    "customers:read",
+    "reports:read",
+    "support:read",
+  ],
+  FRONT_DESK: [
+    "shipments:read", "shipments:write",
+    "customers:read", "customers:write",
+    "invoices:read",
+    "support:read", "support:write",
   ],
 };
 

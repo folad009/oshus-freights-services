@@ -11,6 +11,8 @@ export const UserRole = {
   DRIVER: "DRIVER",
   DISPATCHER: "DISPATCHER",
   FINANCE_OFFICER: "FINANCE_OFFICER",
+  MARKETING: "MARKETING",
+  FRONT_DESK: "FRONT_DESK",
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -98,6 +100,15 @@ export const TicketCategory = {
 } as const;
 
 export type TicketCategory = (typeof TicketCategory)[keyof typeof TicketCategory];
+
+export const TicketStatus = {
+  OPEN: "OPEN",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+  CLOSED: "CLOSED",
+} as const;
+
+export type TicketStatus = (typeof TicketStatus)[keyof typeof TicketStatus];
 
 export const AuditAction = {
   CREATE: "CREATE",

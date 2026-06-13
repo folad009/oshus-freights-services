@@ -102,6 +102,32 @@ async function main() {
     },
   });
 
+  await db.user.upsert({
+    where: { email: "marketing@oshus.com" },
+    update: demoUserUpdate,
+    create: {
+      firstName: "Emily",
+      lastName: "Nguyen",
+      email: "marketing@oshus.com",
+      passwordHash,
+      role: UserRole.MARKETING,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  await db.user.upsert({
+    where: { email: "frontdesk@oshus.com" },
+    update: demoUserUpdate,
+    create: {
+      firstName: "Lisa",
+      lastName: "Johnson",
+      email: "frontdesk@oshus.com",
+      passwordHash,
+      role: UserRole.FRONT_DESK,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
   const customer = await db.customer.upsert({
     where: { userId: customerUser.id },
     update: {},
@@ -167,20 +193,28 @@ async function main() {
     },
   });
 
-  const zone = await db.zone.create({
-    data: { warehouseId: warehouse.id, name: "Zone A", code: "ZA" },
+  const zone = await db.zone.upsert({
+    where: { id: "seed-zone-1" },
+    update: { warehouseId: warehouse.id, name: "Zone A", code: "ZA" },
+    create: { id: "seed-zone-1", warehouseId: warehouse.id, name: "Zone A", code: "ZA" },
   });
 
-  const rack = await db.rack.create({
-    data: { zoneId: zone.id, name: "Rack 1", code: "R1" },
+  const rack = await db.rack.upsert({
+    where: { id: "seed-rack-1" },
+    update: { zoneId: zone.id, name: "Rack 1", code: "R1" },
+    create: { id: "seed-rack-1", zoneId: zone.id, name: "Rack 1", code: "R1" },
   });
 
-  const shelf = await db.shelf.create({
-    data: { rackId: rack.id, name: "Shelf 1", code: "S1" },
+  const shelf = await db.shelf.upsert({
+    where: { id: "seed-shelf-1" },
+    update: { rackId: rack.id, name: "Shelf 1", code: "S1" },
+    create: { id: "seed-shelf-1", rackId: rack.id, name: "Shelf 1", code: "S1" },
   });
 
-  const bin = await db.bin.create({
-    data: { shelfId: shelf.id, name: "Bin 1", code: "B1" },
+  const bin = await db.bin.upsert({
+    where: { id: "seed-bin-1" },
+    update: { shelfId: shelf.id, name: "Bin 1", code: "B1" },
+    create: { id: "seed-bin-1", shelfId: shelf.id, name: "Bin 1", code: "B1" },
   });
 
   await db.inventoryItem.createMany({
@@ -256,28 +290,30 @@ async function main() {
     },
   });
 
-  await db.shipment.updateMany({
-    where: { trackingNumber: "OSH-M2K9F8-A3B7" },
-    data: { warehouseId: warehouse.id },
-  });
-  await db.shipment.updateMany({
-    where: { trackingNumber: "OSH-M2K9G1-C4D8" },
-    data: { warehouseId: warehouse2.id },
-  });
+  const shipment1Data = {
+    customerId: customer.id,
+    warehouseId: warehouse.id,
+    shipmentType: ShipmentType.EXPRESS,
+    weight: 25.5,
+    lengthCm: 120,
+    widthCm: 80,
+    heightCm: 60,
+    packageCount: 2,
+    cbm: (120 * 80 * 60 * 2) / 1_000_000,
+    origin: "New York, NY",
+    destination: "Los Angeles, CA",
+    status: ShipmentStatus.IN_TRANSIT,
+    driverId: driver.id,
+    vehicleId: vehicle.id,
+    estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+  };
 
-  const shipment1 = await db.shipment.create({
-    data: {
+  const shipment1 = await db.shipment.upsert({
+    where: { trackingNumber: "OSH-M2K9F8-A3B7" },
+    update: shipment1Data,
+    create: {
       trackingNumber: "OSH-M2K9F8-A3B7",
-      customerId: customer.id,
-      warehouseId: warehouse.id,
-      shipmentType: ShipmentType.EXPRESS,
-      weight: 25.5,
-      origin: "New York, NY",
-      destination: "Los Angeles, CA",
-      status: ShipmentStatus.IN_TRANSIT,
-      driverId: driver.id,
-      vehicleId: vehicle.id,
-      estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      ...shipment1Data,
       events: {
         create: [
           { eventType: ShipmentStatus.DRAFT, location: "New York, NY", notes: "Shipment created" },
@@ -295,17 +331,28 @@ async function main() {
     },
   });
 
-  await db.shipment.create({
-    data: {
+  const shipment2Data = {
+    customerId: customer.id,
+    warehouseId: warehouse2.id,
+    shipmentType: ShipmentType.STANDARD,
+    weight: 12.0,
+    lengthCm: 90,
+    widthCm: 50,
+    heightCm: 40,
+    packageCount: 1,
+    cbm: (90 * 50 * 40) / 1_000_000,
+    origin: "Boston, MA",
+    destination: "Miami, FL",
+    status: ShipmentStatus.DELIVERED,
+    actualDelivery: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+  };
+
+  await db.shipment.upsert({
+    where: { trackingNumber: "OSH-M2K9G1-C4D8" },
+    update: shipment2Data,
+    create: {
       trackingNumber: "OSH-M2K9G1-C4D8",
-      customerId: customer.id,
-      warehouseId: warehouse2.id,
-      shipmentType: ShipmentType.STANDARD,
-      weight: 12.0,
-      origin: "Boston, MA",
-      destination: "Miami, FL",
-      status: ShipmentStatus.DELIVERED,
-      actualDelivery: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      ...shipment2Data,
       events: {
         create: [
           { eventType: ShipmentStatus.DRAFT, location: "Boston, MA" },
@@ -315,8 +362,19 @@ async function main() {
     },
   });
 
-  const invoice = await db.invoice.create({
-    data: {
+  const invoice = await db.invoice.upsert({
+    where: { invoiceNumber: "INV-2026-00001" },
+    update: {
+      customerId: customer.id,
+      shipmentId: shipment1.id,
+      serviceType: "Express Shipping",
+      amount: 450.0,
+      tax: 45.0,
+      totalAmount: 495.0,
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      status: InvoiceStatus.SENT,
+    },
+    create: {
       invoiceNumber: "INV-2026-00001",
       customerId: customer.id,
       shipmentId: shipment1.id,
@@ -329,8 +387,18 @@ async function main() {
     },
   });
 
-  await db.invoice.create({
-    data: {
+  const paidInvoice = await db.invoice.upsert({
+    where: { invoiceNumber: "INV-2026-00002" },
+    update: {
+      customerId: customer.id,
+      serviceType: "Warehousing",
+      amount: 1200.0,
+      tax: 120.0,
+      totalAmount: 1320.0,
+      dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      status: InvoiceStatus.PAID,
+    },
+    create: {
       invoiceNumber: "INV-2026-00002",
       customerId: customer.id,
       serviceType: "Warehousing",
@@ -339,27 +407,42 @@ async function main() {
       totalAmount: 1320.0,
       dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       status: InvoiceStatus.PAID,
-      payments: {
-        create: {
-          paymentMethod: PaymentMethod.BANK_TRANSFER,
-          amount: 1320.0,
-          reference: "TXN-2026-001",
-        },
-      },
     },
   });
 
-  await db.supportTicket.create({
-    data: {
+  const existingPayment = await db.payment.findFirst({
+    where: { invoiceId: paidInvoice.id, reference: "TXN-2026-001" },
+  });
+  if (!existingPayment) {
+    await db.payment.create({
+      data: {
+        invoiceId: paidInvoice.id,
+        paymentMethod: PaymentMethod.BANK_TRANSFER,
+        amount: 1320.0,
+        reference: "TXN-2026-001",
+      },
+    });
+  }
+
+  const existingTicket = await db.supportTicket.findFirst({
+    where: {
       customerId: customer.id,
-      createdById: customerUser.id,
-      assigneeId: admin.id,
-      category: TicketCategory.SHIPMENT_DELAY,
-      status: TicketStatus.IN_PROGRESS,
       subject: "Delayed express shipment",
-      description: "Shipment OSH-M2K9F8-A3B7 appears to be delayed past estimated delivery date.",
     },
   });
+  if (!existingTicket) {
+    await db.supportTicket.create({
+      data: {
+        customerId: customer.id,
+        createdById: customerUser.id,
+        assigneeId: admin.id,
+        category: TicketCategory.SHIPMENT_DELAY,
+        status: TicketStatus.IN_PROGRESS,
+        subject: "Delayed express shipment",
+        description: "Shipment OSH-M2K9F8-A3B7 appears to be delayed past estimated delivery date.",
+      },
+    });
+  }
 
   await db.auditLog.createMany({
     data: [
@@ -376,6 +459,8 @@ async function main() {
   console.log("  Warehouse:  warehouse@oshus.com");
   console.log("  Driver:     driver@oshus.com");
   console.log("  Finance:    finance@oshus.com");
+  console.log("  Marketing:  marketing@oshus.com");
+  console.log("  Front Desk: frontdesk@oshus.com");
   console.log("\nTrack shipment: OSH-M2K9F8-A3B7");
 }
 

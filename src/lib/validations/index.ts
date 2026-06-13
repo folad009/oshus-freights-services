@@ -44,6 +44,13 @@ export const createShipmentSchema = z.object({
   customerId: z.string().optional(),
   shipmentType: z.nativeEnum(ShipmentType),
   weight: z.number({ message: "Weight is required" }).positive("Weight must be greater than 0"),
+  lengthCm: z.number({ message: "Length is required" }).positive("Length must be greater than 0"),
+  widthCm: z.number({ message: "Width is required" }).positive("Width must be greater than 0"),
+  heightCm: z.number({ message: "Height is required" }).positive("Height must be greater than 0"),
+  packageCount: z
+    .number({ message: "Package count is required" })
+    .int("Package count must be a whole number")
+    .positive("Package count must be at least 1"),
   origin: z.string().min(1, "Origin is required"),
   destination: z.string().min(1, "Destination is required"),
   scheduledPickup: z.string().optional(),
@@ -54,6 +61,10 @@ export const createShipmentSchema = z.object({
 export const updateShipmentSchema = z.object({
   shipmentType: z.nativeEnum(ShipmentType).optional(),
   weight: z.number().positive().optional(),
+  lengthCm: z.number().positive().optional(),
+  widthCm: z.number().positive().optional(),
+  heightCm: z.number().positive().optional(),
+  packageCount: z.number().int().positive().optional(),
   origin: z.string().min(1).optional(),
   destination: z.string().min(1).optional(),
   status: z.nativeEnum(ShipmentStatus).optional(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Plus, Pencil, UserRound } from "lucide-react";
@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { ShipmentFormDialog } from "@/components/forms/shipment-form-dialog";
 import { ShipmentAssignDialog } from "@/components/forms/shipment-assign-dialog";
-import { formatDate } from "@/lib/helpers";
+import { formatDate, formatCbm } from "@/lib/helpers";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
 
@@ -47,6 +47,13 @@ export default function ShipmentsPage() {
     queryFn: fetchShipments,
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("shipmentType") || params.has("lengthCm") || params.has("customerId")) {
+      window.history.replaceState(null, "", "/dashboard/shipments");
+    }
+  }, []);
+
   function openCreate() {
     setEditId(null);
     setFormOpen(true);
@@ -62,10 +69,13 @@ export default function ShipmentsPage() {
     setAssignOpen(true);
   }
 
-  function handleSuccess() {
-    queryClient.invalidateQueries({ queryKey: ["shipments"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  async function handleSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["shipments"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    ]);
+    await queryClient.refetchQueries({ queryKey: ["shipments"] });
   }
 
   const actionColCount = (canWrite ? 1 : 0) + (canAssign ? 1 : 0);
@@ -108,6 +118,7 @@ export default function ShipmentsPage() {
                   <TableHead>Driver</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Weight</TableHead>
+                  <TableHead>CBM</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   {actionColCount > 0 && <TableHead className="w-24" />}
@@ -117,7 +128,7 @@ export default function ShipmentsPage() {
                 {!data?.length ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10 + (actionColCount > 0 ? 1 : 0)}
+                      colSpan={11 + (actionColCount > 0 ? 1 : 0)}
                       className="text-center text-muted-foreground"
                     >
                       No shipments found
@@ -136,6 +147,7 @@ export default function ShipmentsPage() {
                       destination: string;
                       shipmentType: string;
                       weight: number;
+                      cbm: number | null;
                       status: string;
                       createdAt: string;
                     }) => (
@@ -170,6 +182,7 @@ export default function ShipmentsPage() {
                         </TableCell>
                         <TableCell>{s.shipmentType.replace(/_/g, " ")}</TableCell>
                         <TableCell>{s.weight} kg</TableCell>
+                        <TableCell>{formatCbm(s.cbm)}</TableCell>
                         <TableCell>
                           <StatusBadge status={s.status} type="shipment" />
                         </TableCell>

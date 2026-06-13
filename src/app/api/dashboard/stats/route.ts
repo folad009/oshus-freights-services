@@ -1,4 +1,4 @@
-import { ShipmentStatus, InvoiceStatus, VehicleStatus, UserRole } from "@/types/enums";
+import { ShipmentStatus, InvoiceStatus, VehicleStatus, UserRole, TicketStatus } from "@/types/enums";
 import { db } from "@/lib/db";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
 import { getAuthContext, AuthError } from "@/lib/api-auth";
@@ -30,15 +30,42 @@ export async function GET() {
   try {
     const user = await getAuthContext();
     const shipmentWhere = await buildShipmentWhere(user);
-    const fullAccessRoles: UserRole[] = [UserRole.ADMIN, UserRole.DISPATCHER, UserRole.FINANCE_OFFICER];
+    const fullAccessRoles: UserRole[] = [
+      UserRole.ADMIN,
+      UserRole.DISPATCHER,
+      UserRole.FINANCE_OFFICER,
+      UserRole.MARKETING,
+      UserRole.FRONT_DESK,
+    ];
     const inventoryRoles: UserRole[] = [UserRole.ADMIN, UserRole.WAREHOUSE_STAFF, UserRole.DISPATCHER];
     const fleetRoles: UserRole[] = [UserRole.ADMIN, UserRole.DISPATCHER];
     const financeRoles: UserRole[] = [UserRole.ADMIN, UserRole.FINANCE_OFFICER];
+    const customerMetricRoles: UserRole[] = [
+      UserRole.ADMIN,
+      UserRole.FINANCE_OFFICER,
+      UserRole.MARKETING,
+      UserRole.FRONT_DESK,
+    ];
+    const supportMetricRoles: UserRole[] = [
+      UserRole.ADMIN,
+      UserRole.MARKETING,
+      UserRole.FRONT_DESK,
+    ];
+    const draftShipmentRoles: UserRole[] = [UserRole.ADMIN, UserRole.FRONT_DESK];
+    const invoiceReadRoles: UserRole[] = [
+      UserRole.ADMIN,
+      UserRole.FINANCE_OFFICER,
+      UserRole.FRONT_DESK,
+    ];
 
     const isFullAccess = fullAccessRoles.includes(user.role);
     const showInventory = inventoryRoles.includes(user.role);
     const showFleet = fleetRoles.includes(user.role);
     const showFinance = financeRoles.includes(user.role);
+    const showCustomers = customerMetricRoles.includes(user.role);
+    const showSupportMetrics = supportMetricRoles.includes(user.role);
+    const showDraftShipments = draftShipmentRoles.includes(user.role);
+    const showOutstandingInvoices = showFinance || user.role === UserRole.CUSTOMER || invoiceReadRoles.includes(user.role);
 
     const warehouseScope = await getWarehouseScope(user);
     const inventoryWhere = showInventory ? buildWarehouseIdFilter(warehouseScope) : {};
@@ -66,6 +93,9 @@ export async function GET() {
       totalInventory,
       fleetTotal,
       fleetInUse,
+      totalCustomers,
+      openSupportTickets,
+      draftShipments,
       recentShipments,
     ] = await Promise.all([
       db.shipment.count({
@@ -89,7 +119,7 @@ export async function GET() {
       showFinance
         ? db.payment.aggregate({ _sum: { amount: true } })
         : Promise.resolve({ _sum: { amount: 0 } }),
-      showFinance || user.role === UserRole.CUSTOMER
+      showOutstandingInvoices
         ? db.invoice.count({
             where: {
               ...invoiceWhere,
@@ -106,6 +136,15 @@ export async function GET() {
       showFleet ? db.vehicle.count() : Promise.resolve(0),
       showFleet
         ? db.vehicle.count({ where: { status: VehicleStatus.IN_USE } })
+        : Promise.resolve(0),
+      showCustomers ? db.customer.count() : Promise.resolve(0),
+      showSupportMetrics
+        ? db.supportTicket.count({
+            where: { status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] } },
+          })
+        : Promise.resolve(0),
+      showDraftShipments
+        ? db.shipment.count({ where: { status: ShipmentStatus.DRAFT } })
         : Promise.resolve(0),
       db.shipment.findMany({
         where: shipmentWhere,
@@ -124,6 +163,9 @@ export async function GET() {
       totalInventory: totalInventory._sum.quantity ?? 0,
       lowStockItems,
       fleetUtilization: fleetTotal > 0 ? Math.round((fleetInUse / fleetTotal) * 100) : 0,
+      totalCustomers,
+      openSupportTickets,
+      draftShipments,
       recentShipments,
       scope: isFullAccess ? "full" : user.role.toLowerCase(),
     });

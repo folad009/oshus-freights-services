@@ -57,6 +57,22 @@ export function formatDate(date: Date | string): string {
   }).format(new Date(date));
 }
 
+export function calculateCbm(params: {
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  packageCount?: number;
+}) {
+  const count = params.packageCount ?? 1;
+  const cbm = (params.lengthCm * params.widthCm * params.heightCm * count) / 1_000_000;
+  return Math.round(cbm * 10_000) / 10_000;
+}
+
+export function formatCbm(cbm: number | null | undefined) {
+  if (cbm == null) return "—";
+  return `${cbm.toFixed(3)} m³`;
+}
+
 export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   SCHEDULED: "Scheduled",

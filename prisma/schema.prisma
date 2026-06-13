@@ -14,6 +14,8 @@ enum UserRole {
   DRIVER
   DISPATCHER
   FINANCE_OFFICER
+  MARKETING
+  FRONT_DESK
 }
 
 enum UserStatus {
@@ -191,6 +193,11 @@ model Shipment {
   customerId      String
   shipmentType    ShipmentType
   weight          Float
+  lengthCm        Float?
+  widthCm         Float?
+  heightCm        Float?
+  packageCount    Int            @default(1)
+  cbm             Float?
   origin          String
   destination     String
   status          ShipmentStatus @default(DRAFT)

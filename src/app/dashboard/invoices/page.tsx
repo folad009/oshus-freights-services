@@ -192,9 +192,7 @@ export default function InvoicesPage() {
         onOpenChange={setViewOpen}
         invoiceId={viewId}
         canEdit={canWrite}
-        canPay={isCustomer}
         onEdit={openEdit}
-        onPay={openPay}
       />
 
       <InvoicePayDialog
