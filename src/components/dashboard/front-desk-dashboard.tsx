@@ -43,6 +43,7 @@ async function fetchStats(): Promise<DashboardStats> {
 }
 
 const quickLinks = [
+  { title: "Scan & Track", href: "/dashboard/scan", description: "Scan package barcodes at the desk" },
   { title: "Shipments", href: "/dashboard/shipments", description: "Create and manage walk-in requests" },
   { title: "Customers", href: "/dashboard/customers", description: "Register and update customer details" },
   { title: "Support", href: "/dashboard/support", description: "Handle customer inquiries" },

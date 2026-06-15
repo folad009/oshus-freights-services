@@ -1,6 +1,7 @@
 import net from "net";
-import { buildInvoiceEscPos, invoiceDetailsToPrintData } from "@/lib/escpos";
+import { buildInvoiceEscPos, buildManifestEscPos, invoiceDetailsToPrintData } from "@/lib/escpos";
 import { formatDate } from "@/lib/helpers";
+import { manifestToPrintData, shipmentToManifestData } from "@/lib/shipment-manifest";
 
 export function getXPrinterConfig() {
   const host = process.env.XPRINTER_HOST?.trim();
@@ -90,6 +91,49 @@ export async function printInvoiceEscPosToNetwork(invoice: {
       customer: invoice.customer,
       shipment: invoice.shipment,
     })
+  );
+
+  try {
+    await sendEscPosToNetworkPrinter(config.host, config.port, payload);
+    return { ok: true as const };
+  } catch (error) {
+    return {
+      ok: false as const,
+      code: "NETWORK_PRINT_FAILED" as const,
+      message: error instanceof Error ? error.message : "Network print failed",
+    };
+  }
+}
+
+export async function printManifestEscPosToNetwork(shipment: {
+  id: string;
+  trackingNumber: string;
+  shipmentType: string;
+  status: string;
+  origin: string;
+  destination: string;
+  weight: number;
+  packageCount?: number | null;
+  cbm?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  createdAt: Date | string;
+  notes?: string | null;
+  customer: {
+    companyName: string;
+    contactPerson?: string;
+    phone?: string;
+  };
+  warehouse?: { code: string; name: string } | null;
+}) {
+  const config = getXPrinterConfig();
+  if (!config) {
+    return { ok: false as const, code: "PRINTER_NOT_CONFIGURED" as const };
+  }
+
+  const payload = buildManifestEscPos(
+    manifestToPrintData(shipmentToManifestData(shipment))
   );
 
   try {

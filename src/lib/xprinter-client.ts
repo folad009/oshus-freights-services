@@ -2,10 +2,12 @@
 
 import {
   buildInvoiceEscPos,
+  buildManifestEscPos,
   invoiceDetailsToPrintData,
   type InvoicePrintData,
 } from "@/lib/escpos";
 import { formatDate } from "@/lib/helpers";
+import { manifestToPrintData, shipmentToManifestData } from "@/lib/shipment-manifest";
 
 const XPRINTER_USB_FILTERS: USBDeviceFilter[] = [
   { classCode: 7 },
@@ -25,6 +27,29 @@ type InvoiceForPrint = {
   dueDate: string;
   customer: { companyName: string };
   shipment: { trackingNumber: string; weight: number } | null;
+};
+
+type ShipmentForPrint = {
+  id: string;
+  trackingNumber: string;
+  shipmentType: string;
+  status: string;
+  origin: string;
+  destination: string;
+  weight: number;
+  packageCount?: number | null;
+  cbm?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  createdAt: string;
+  notes?: string | null;
+  customer: {
+    companyName: string;
+    contactPerson?: string;
+    phone?: string;
+  };
+  warehouse?: { code: string; name: string } | null;
 };
 
 type PrintMethod = "usb" | "network";
@@ -161,5 +186,72 @@ export async function printInvoiceToXPrinter(invoice: InvoiceForPrint) {
   throw new Error(
     networkResult.message ??
       "Could not print to XPrinter. For USB printers use Chrome/Edge. For network printers set XPRINTER_HOST to the printer IP."
+  );
+}
+
+async function printManifestViaNetwork(shipment: ShipmentForPrint) {
+  const response = await fetch("/api/print/shipment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shipmentId: shipment.id }),
+  });
+
+  const json = (await response.json()) as {
+    success: boolean;
+    data?: {
+      printed: boolean;
+      method: PrintMethod | null;
+      code?: string;
+      message?: string;
+    };
+    message?: string;
+  };
+
+  if (json.success && json.data?.printed) {
+    return { method: "network" as const };
+  }
+
+  const code = json.data?.code;
+  const message = json.data?.message ?? json.message;
+
+  if (code === "PRINTER_NOT_CONFIGURED" || code === "NETWORK_PRINT_FAILED") {
+    return {
+      method: null,
+      code: code as "PRINTER_NOT_CONFIGURED" | "NETWORK_PRINT_FAILED",
+      message,
+    };
+  }
+
+  throw new Error(message ?? "Could not send the manifest to the network XPrinter.");
+}
+
+export async function printManifestViaWebUsb(shipment: ShipmentForPrint) {
+  const device = await connectPrinter();
+  const payload = buildManifestEscPos(
+    manifestToPrintData(shipmentToManifestData(shipment))
+  );
+  await sendEscPosToUsb(device, payload);
+}
+
+export async function printManifestToXPrinter(shipment: ShipmentForPrint) {
+  const authorizedUsb = await findAuthorizedPrinter();
+  if (authorizedUsb) {
+    await printManifestViaWebUsb(shipment);
+    return { method: "usb" as const };
+  }
+
+  const networkResult = await printManifestViaNetwork(shipment);
+  if (networkResult.method === "network") {
+    return { method: "network" as const };
+  }
+
+  if (navigator.usb) {
+    await printManifestViaWebUsb(shipment);
+    return { method: "usb" as const };
+  }
+
+  throw new Error(
+    networkResult.message ??
+      "Could not print manifest to XPrinter. For USB printers use Chrome/Edge. For network printers set XPRINTER_HOST to the printer IP."
   );
 }

@@ -239,7 +239,7 @@ interface ShipmentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipmentId?: string | null;
-  onSuccess?: () => void | Promise<void>;
+  onSuccess?: (shipmentId?: string) => void | Promise<void>;
 }
 
 async function fetchCustomers() {
@@ -393,7 +393,7 @@ function ShipmentCreateForm({
       }
       toast.success(`Shipment ${json.data.trackingNumber} created`);
       onOpenChange(false);
-      await onSuccess?.();
+      await onSuccess?.(json.data.id);
     } catch {
       toast.error("Something went wrong");
     } finally {

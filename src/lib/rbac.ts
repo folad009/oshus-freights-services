@@ -117,6 +117,7 @@ export function getNavItems(role: UserRole, basePath: string): NavItem[] {
   const items: NavItem[] = [
     { title: "Dashboard", href: basePath, icon: "LayoutDashboard" },
     { title: "Shipments", href: "/dashboard/shipments", icon: "Package", permission: "shipments:read" },
+    { title: "Scan & Track", href: "/dashboard/scan", icon: "ScanBarcode", permission: "shipments:read" },
     { title: "Customers", href: "/dashboard/customers", icon: "Users", permission: "customers:read" },
     { title: "Inventory", href: "/dashboard/inventory", icon: "Boxes", permission: "inventory:read" },
     { title: "Warehouses", href: "/dashboard/warehouses", icon: "Warehouse", permission: "warehouses:read" },

@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardBarcodeScanner } from "@/components/dashboard-barcode-scanner";
 import { Separator } from "@/components/ui/separator";
+import { hasPermission } from "@/lib/rbac";
+import { UserRole } from "@/types/enums";
 
 export default async function DashboardLayout({
   children,
@@ -13,8 +16,12 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const role = session.user.role as UserRole;
+  const canScanShipments = hasPermission(role, "shipments:read");
+
   return (
     <SidebarProvider>
+      <DashboardBarcodeScanner enabled={canScanShipments} />
       <AppSidebar
         role={session.user.role}
         userName={session.user.name ?? "User"}

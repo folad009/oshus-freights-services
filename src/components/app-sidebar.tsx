@@ -17,6 +17,7 @@ import {
   BarChart3,
   UserCog,
   Shield,
+  ScanBarcode,
   LogOut,
   ChevronUp,
 } from "lucide-react";
@@ -57,6 +58,7 @@ const ICON_MAP = {
   BarChart3,
   UserCog,
   Shield,
+  ScanBarcode,
 };
 
 interface AppSidebarProps {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Plus, Pencil, UserRound } from "lucide-react";
+import { Plus, Pencil, Printer, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { ShipmentFormDialog } from "@/components/forms/shipment-form-dialog";
 import { ShipmentAssignDialog } from "@/components/forms/shipment-assign-dialog";
+import { ShipmentManifestDialog } from "@/components/forms/shipment-manifest-dialog";
 import { formatDate, formatCbm } from "@/lib/helpers";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
@@ -34,11 +35,14 @@ export default function ShipmentsPage() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [manifestOpen, setManifestOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
+  const [manifestId, setManifestId] = useState<string | null>(null);
 
   const role = session?.user?.role as UserRole | undefined;
   const isWarehouseStaff = role === UserRole.WAREHOUSE_STAFF;
+  const canRead = role ? hasPermission(role, "shipments:read") : false;
   const canWrite = role ? hasPermission(role, "shipments:write") : false;
   const canAssign = role ? hasPermission(role, "shipments:assign") : false;
 
@@ -69,16 +73,26 @@ export default function ShipmentsPage() {
     setAssignOpen(true);
   }
 
-  async function handleSuccess() {
+  function openManifest(id: string) {
+    setManifestId(id);
+    setManifestOpen(true);
+  }
+
+  async function handleSuccess(createdShipmentId?: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["shipments"] }),
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
       queryClient.invalidateQueries({ queryKey: ["notifications"] }),
     ]);
     await queryClient.refetchQueries({ queryKey: ["shipments"] });
+
+    if (createdShipmentId) {
+      openManifest(createdShipmentId);
+    }
   }
 
-  const actionColCount = (canWrite ? 1 : 0) + (canAssign ? 1 : 0);
+  const actionColCount =
+    (canRead ? 1 : 0) + (canWrite ? 1 : 0) + (canAssign ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -192,6 +206,16 @@ export default function ShipmentsPage() {
                         {actionColCount > 0 && (
                           <TableCell>
                             <div className="flex items-center gap-1">
+                              {canRead && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Print package manifest"
+                                  onClick={() => openManifest(s.id)}
+                                >
+                                  <Printer />
+                                </Button>
+                              )}
                               {canAssign && (
                                 <Button
                                   variant="ghost"
@@ -230,6 +254,12 @@ export default function ShipmentsPage() {
         onOpenChange={setFormOpen}
         shipmentId={editId}
         onSuccess={handleSuccess}
+      />
+
+      <ShipmentManifestDialog
+        open={manifestOpen}
+        onOpenChange={setManifestOpen}
+        shipmentId={manifestId}
       />
 
       <ShipmentAssignDialog

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDate } from "@/lib/helpers";
+import { ShipmentBarcode } from "@/components/shipment-barcode";
 
 interface InvoiceViewDialogProps {
   open: boolean;
@@ -68,10 +69,10 @@ export function InvoiceViewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Invoice Details</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-center font-bold text-2xl">Waybill</DialogTitle>
+          {/*<DialogDescription>
             {invoice ? invoice.invoiceNumber : "Loading invoice..."}
-          </DialogDescription>
+          </DialogDescription>*/}
         </DialogHeader>
 
         {isLoading || !invoice ? (
@@ -100,10 +101,13 @@ export function InvoiceViewDialog({
                     }
                   />
                   <DetailRow label="Weight" value={`${invoice.shipment.weight} kg`} />
+                  <div className="rounded-md border bg-white px-3 py-2">
+                    <ShipmentBarcode value={invoice.shipment.trackingNumber} />
+                  </div>
                 </>
               )}
-              <DetailRow label="Created" value={formatDate(invoice.createdAt)} />
-              <DetailRow label="Due Date" value={formatDate(invoice.dueDate)} />
+              {/*<DetailRow label="Created" value={formatDate(invoice.createdAt)} />
+              <DetailRow label="Due Date" value={formatDate(invoice.dueDate)} />*/}
             </div>
           </div>
         )}
