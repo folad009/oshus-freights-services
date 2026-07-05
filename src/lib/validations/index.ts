@@ -40,8 +40,41 @@ export const updateCustomerSchema = z.object({
   email: z.string().email("Invalid email"),
 });
 
-export const createShipmentSchema = z.object({
-  customerId: z.string().optional(),
+const shipmentServiceRefinement = (
+  data: {
+    requestPickup?: boolean;
+    requestDelivery?: boolean;
+    pickupAddress?: string;
+    deliveryAddress?: string;
+    hasInsurance?: boolean;
+    declaredValue?: number;
+  },
+  ctx: z.RefinementCtx
+) => {
+  if (data.requestPickup && !data.pickupAddress?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Pickup address is required when door pickup is selected",
+      path: ["pickupAddress"],
+    });
+  }
+  if (data.requestDelivery && !data.deliveryAddress?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Delivery address is required when door delivery is selected",
+      path: ["deliveryAddress"],
+    });
+  }
+  if (data.hasInsurance && (data.declaredValue == null || data.declaredValue <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Declared value is required for insurance coverage",
+      path: ["declaredValue"],
+    });
+  }
+};
+
+const shipmentCoreFieldsSchema = z.object({
   shipmentType: z.nativeEnum(ShipmentType),
   weight: z.number({ message: "Weight is required" }).positive("Weight must be greater than 0"),
   lengthCm: z.number({ message: "Length is required" }).positive("Length must be greater than 0"),
@@ -55,8 +88,21 @@ export const createShipmentSchema = z.object({
   destination: z.string().min(1, "Destination is required"),
   scheduledPickup: z.string().optional(),
   notes: z.string().optional(),
-  warehouseId: z.string().optional(),
+  requestPickup: z.boolean().optional(),
+  requestDelivery: z.boolean().optional(),
+  pickupAddress: z.string().optional(),
+  deliveryAddress: z.string().optional(),
+  hasInsurance: z.boolean().optional(),
+  declaredValue: z.number().positive("Declared value must be greater than 0").optional(),
 });
+
+export const createShipmentSchema = shipmentCoreFieldsSchema
+  .extend({
+    customerId: z.string().optional(),
+    warehouseId: z.string().optional(),
+    acceptedTerms: z.boolean().optional(),
+  })
+  .superRefine(shipmentServiceRefinement);
 
 export const updateShipmentSchema = z.object({
   shipmentType: z.nativeEnum(ShipmentType).optional(),
@@ -169,6 +215,28 @@ export const assignWarehouseStaffSchema = z.object({
   isManager: z.boolean().optional(),
 });
 
+export const createShipmentIntakeLinkSchema = z.object({
+  warehouseId: z.string().optional(),
+});
+
+const shipmentIntakeCustomerFields = z.object({
+  companyName: z.string().min(1, "Company or sender name is required"),
+  contactPerson: z.string().min(1, "Contact person is required"),
+  phone: z.string().min(1, "Phone number is required"),
+  address: z.string().min(1, "Address is required"),
+  email: z.string().email("Invalid email address"),
+});
+
+export const submitShipmentIntakeSchema = shipmentIntakeCustomerFields
+  .merge(
+    shipmentCoreFieldsSchema.extend({
+      acceptedTerms: z.boolean().refine((val) => val === true, {
+        message: "You must accept the terms and conditions",
+      }),
+    })
+  )
+  .superRefine(shipmentServiceRefinement);
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateShipmentInput = z.infer<typeof createShipmentSchema>;
 export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>;
@@ -181,3 +249,5 @@ export type PayInvoiceInput = z.infer<typeof payInvoiceSchema>;
 export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>;
 export type UpdateWarehouseInput = z.infer<typeof updateWarehouseSchema>;
 export type AssignWarehouseStaffInput = z.infer<typeof assignWarehouseStaffSchema>;
+export type CreateShipmentIntakeLinkInput = z.infer<typeof createShipmentIntakeLinkSchema>;
+export type SubmitShipmentIntakeInput = z.infer<typeof submitShipmentIntakeSchema>;

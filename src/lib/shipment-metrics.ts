@@ -10,7 +10,7 @@ export const CONTAINER_CAPACITIES = {
 export type ContainerType = keyof typeof CONTAINER_CAPACITIES;
 
 const CONTAINER_SHIPMENT_TYPES: ShipmentTypeValue[] = [
-  ShipmentType.FREIGHT,
+  ShipmentType.STANDARD_SEA_FREIGHT,
   ShipmentType.BULK_CARGO,
   ShipmentType.INTERNATIONAL,
 ];

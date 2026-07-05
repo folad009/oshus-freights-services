@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Plus, Pencil, Printer, UserRound } from "lucide-react";
+import { Plus, Eye, Pencil, Printer, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,9 +17,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { ShipmentFormDialog } from "@/components/forms/shipment-form-dialog";
+import { ShipmentViewDialog } from "@/components/forms/shipment-view-dialog";
 import { ShipmentAssignDialog } from "@/components/forms/shipment-assign-dialog";
 import { ShipmentManifestDialog } from "@/components/forms/shipment-manifest-dialog";
 import { formatDate, formatCbm } from "@/lib/helpers";
+import { getShipmentTypeLabel } from "@/lib/shipment-types";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
 
@@ -34,17 +36,22 @@ export default function ShipmentsPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [manifestOpen, setManifestOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
   const [manifestId, setManifestId] = useState<string | null>(null);
 
   const role = session?.user?.role as UserRole | undefined;
+  const isCustomer = role === UserRole.CUSTOMER;
   const isWarehouseStaff = role === UserRole.WAREHOUSE_STAFF;
   const canRead = role ? hasPermission(role, "shipments:read") : false;
   const canWrite = role ? hasPermission(role, "shipments:write") : false;
   const canAssign = role ? hasPermission(role, "shipments:assign") : false;
+  const canPrint = canRead && !isCustomer;
+  const canEdit = canWrite && !isCustomer;
 
   const { data, isLoading } = useQuery({
     queryKey: ["shipments"],
@@ -68,6 +75,11 @@ export default function ShipmentsPage() {
     setFormOpen(true);
   }
 
+  function openView(id: string) {
+    setViewId(id);
+    setViewOpen(true);
+  }
+
   function openAssign(id: string) {
     setAssignId(id);
     setAssignOpen(true);
@@ -83,16 +95,16 @@ export default function ShipmentsPage() {
       queryClient.invalidateQueries({ queryKey: ["shipments"] }),
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
       queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      queryClient.invalidateQueries({ queryKey: ["invoices"] }),
     ]);
     await queryClient.refetchQueries({ queryKey: ["shipments"] });
 
-    if (createdShipmentId) {
+    if (createdShipmentId && !isCustomer) {
       openManifest(createdShipmentId);
     }
   }
 
-  const actionColCount =
-    (canRead ? 1 : 0) + (canWrite ? 1 : 0) + (canAssign ? 1 : 0);
+  const showActions = isCustomer || canPrint || canEdit || canAssign;
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,9 +112,11 @@ export default function ShipmentsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Shipments</h1>
           <p className="text-muted-foreground">
-            {isWarehouseStaff
-              ? "Shipments routed through your assigned warehouse branch(es)"
-              : "Manage and track all shipments"}
+            {isCustomer
+              ? "Create shipments and view your booking history"
+              : isWarehouseStaff
+                ? "Shipments routed through your assigned warehouse branch(es)"
+                : "Manage and track all shipments"}
           </p>
         </div>
         {canWrite && (
@@ -115,7 +129,9 @@ export default function ShipmentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{isWarehouseStaff ? "Branch Shipments" : "All Shipments"}</CardTitle>
+          <CardTitle>
+            {isCustomer ? "My Shipments" : isWarehouseStaff ? "Branch Shipments" : "All Shipments"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -125,24 +141,24 @@ export default function ShipmentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tracking #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Branch</TableHead>
+                  {!isCustomer && <TableHead>Customer</TableHead>}
+                  {!isCustomer && <TableHead>Branch</TableHead>}
                   <TableHead>Route</TableHead>
-                  <TableHead>Dispatcher</TableHead>
-                  <TableHead>Driver</TableHead>
+                  {!isCustomer && <TableHead>Dispatcher</TableHead>}
+                  {!isCustomer && <TableHead>Driver</TableHead>}
                   <TableHead>Type</TableHead>
                   <TableHead>Weight</TableHead>
                   <TableHead>CBM</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
-                  {actionColCount > 0 && <TableHead className="w-24" />}
+                  {showActions && <TableHead className="w-24" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!data?.length ? (
                   <TableRow>
                     <TableCell
-                      colSpan={11 + (actionColCount > 0 ? 1 : 0)}
+                      colSpan={(isCustomer ? 8 : 11) + (showActions ? 1 : 0)}
                       className="text-center text-muted-foreground"
                     >
                       No shipments found
@@ -167,34 +183,42 @@ export default function ShipmentsPage() {
                     }) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-mono font-medium">{s.trackingNumber}</TableCell>
-                        <TableCell>{s.customer?.companyName ?? "—"}</TableCell>
-                        <TableCell className="text-sm">
-                          {s.warehouse ? (
-                            <>
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {s.warehouse.code}
-                              </span>
-                              <span className="mx-1">·</span>
-                              {s.warehouse.name}
-                            </>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
+                        {!isCustomer && (
+                          <TableCell>{s.customer?.companyName ?? "—"}</TableCell>
+                        )}
+                        {!isCustomer && (
+                          <TableCell className="text-sm">
+                            {s.warehouse ? (
+                              <>
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {s.warehouse.code}
+                                </span>
+                                <span className="mx-1">·</span>
+                                {s.warehouse.name}
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="text-sm">
                           {s.origin} → {s.destination}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {s.dispatcher
-                            ? `${s.dispatcher.firstName} ${s.dispatcher.lastName}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {s.driver
-                            ? `${s.driver.user.firstName} ${s.driver.user.lastName}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell>{s.shipmentType.replace(/_/g, " ")}</TableCell>
+                        {!isCustomer && (
+                          <TableCell className="text-sm">
+                            {s.dispatcher
+                              ? `${s.dispatcher.firstName} ${s.dispatcher.lastName}`
+                              : "—"}
+                          </TableCell>
+                        )}
+                        {!isCustomer && (
+                          <TableCell className="text-sm">
+                            {s.driver
+                              ? `${s.driver.user.firstName} ${s.driver.user.lastName}`
+                              : "—"}
+                          </TableCell>
+                        )}
+                        <TableCell>{getShipmentTypeLabel(s.shipmentType as never)}</TableCell>
                         <TableCell>{s.weight} kg</TableCell>
                         <TableCell>{formatCbm(s.cbm)}</TableCell>
                         <TableCell>
@@ -203,10 +227,20 @@ export default function ShipmentsPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDate(s.createdAt)}
                         </TableCell>
-                        {actionColCount > 0 && (
+                        {showActions && (
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              {canRead && (
+                              {(isCustomer || canRead) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="View shipment"
+                                  onClick={() => openView(s.id)}
+                                >
+                                  <Eye />
+                                </Button>
+                              )}
+                              {canPrint && (
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
@@ -226,7 +260,7 @@ export default function ShipmentsPage() {
                                   <UserRound />
                                 </Button>
                               )}
-                              {canWrite && (
+                              {canEdit && (
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
@@ -252,22 +286,28 @@ export default function ShipmentsPage() {
       <ShipmentFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        shipmentId={editId}
+        shipmentId={isCustomer ? null : editId}
         onSuccess={handleSuccess}
       />
 
-      <ShipmentManifestDialog
-        open={manifestOpen}
-        onOpenChange={setManifestOpen}
-        shipmentId={manifestId}
-      />
+      <ShipmentViewDialog open={viewOpen} onOpenChange={setViewOpen} shipmentId={viewId} />
 
-      <ShipmentAssignDialog
-        open={assignOpen}
-        onOpenChange={setAssignOpen}
-        shipmentId={assignId}
-        onSuccess={handleSuccess}
-      />
+      {!isCustomer && (
+        <>
+          <ShipmentManifestDialog
+            open={manifestOpen}
+            onOpenChange={setManifestOpen}
+            shipmentId={manifestId}
+          />
+
+          <ShipmentAssignDialog
+            open={assignOpen}
+            onOpenChange={setAssignOpen}
+            shipmentId={assignId}
+            onSuccess={handleSuccess}
+          />
+        </>
+      )}
     </div>
   );
 }

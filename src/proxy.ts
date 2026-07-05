@@ -3,15 +3,21 @@ import { ROLE_DASHBOARD_PATH } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
 import { NextResponse } from "next/server";
 
-const publicRoutes = ["/", "/login", "/track"];
+const publicRoutes = ["/", "/login", "/track", "/terms"];
 const authRoutes = ["/login"];
+
+function isPublicPath(pathname: string) {
+  if (publicRoutes.some((route) => pathname === route || pathname.startsWith("/track/"))) {
+    return true;
+  }
+  if (pathname.startsWith("/shipment-request/")) return true;
+  return false;
+}
 
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const isPublicRoute = publicRoutes.some(
-    (route) => nextUrl.pathname === route || nextUrl.pathname.startsWith("/track/")
-  );
+  const isPublicRoute = isPublicPath(nextUrl.pathname);
   const isAuthRoute = authRoutes.includes(nextUrl.pathname);
   const isApiRoute = nextUrl.pathname.startsWith("/api");
   const isDashboard = nextUrl.pathname.startsWith("/dashboard");

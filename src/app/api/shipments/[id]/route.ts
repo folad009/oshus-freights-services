@@ -67,6 +67,10 @@ export async function PATCH(
     const parsed = updateShipmentSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message);
 
+    if (user.role === UserRole.CUSTOMER) {
+      return errorResponse("Customers cannot modify shipments", 403);
+    }
+
     const existing = await db.shipment.findUnique({ where: { id } });
     if (!existing) return errorResponse("Shipment not found", 404);
 
@@ -286,6 +290,10 @@ export async function DELETE(
   try {
     const user = await getAuthContext("shipments:write");
     const { id } = await params;
+
+    if (user.role === UserRole.CUSTOMER) {
+      return errorResponse("Customers cannot delete shipments", 403);
+    }
 
     const existing = await db.shipment.findUnique({ where: { id } });
     if (!existing) return errorResponse("Shipment not found", 404);

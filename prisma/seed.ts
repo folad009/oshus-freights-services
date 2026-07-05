@@ -293,7 +293,7 @@ async function main() {
   const shipment1Data = {
     customerId: customer.id,
     warehouseId: warehouse.id,
-    shipmentType: ShipmentType.EXPRESS,
+    shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
     weight: 25.5,
     lengthCm: 120,
     widthCm: 80,
@@ -334,7 +334,7 @@ async function main() {
   const shipment2Data = {
     customerId: customer.id,
     warehouseId: warehouse2.id,
-    shipmentType: ShipmentType.STANDARD,
+    shipmentType: ShipmentType.STANDARD_SEA_FREIGHT,
     weight: 12.0,
     lengthCm: 90,
     widthCm: 50,

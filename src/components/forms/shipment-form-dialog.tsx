@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,22 +25,23 @@ import {
   type UpdateShipmentInput,
 } from "@/lib/validations";
 import { ShipmentType, ShipmentStatus } from "@/types/enums";
-import { SHIPMENT_STATUS_LABELS, formatCbm } from "@/lib/helpers";
+import {
+  calculateInsuranceCost,
+  calculateShipmentInvoiceBreakdown,
+  DELIVERY_SERVICE_FEE,
+  PICKUP_SERVICE_FEE,
+} from "@/lib/billing";
+import { formatCurrency, SHIPMENT_STATUS_LABELS } from "@/lib/helpers";
+import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
+import { calculateVolumetricWeightKg } from "@/lib/shipment-metrics";
 import {
-  CONTAINER_CAPACITIES,
-  type ContainerType,
-  analyzePackageMetrics,
-  calculateVolumetricWeightKg,
-  defaultContainerType,
-  formatContainerStatus,
-  usesContainerCapacity,
-} from "@/lib/shipment-metrics";
+  PackageMetricsPanel,
+  formSelectClass,
+} from "@/components/forms/shipment-package-metrics-panel";
+import { ShipmentIntakeLinkPanel } from "@/components/forms/shipment-intake-link-panel";
 import { cn } from "@/lib/utils";
-
-const selectClass =
-  "flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 type DimensionErrors = {
   lengthCm?: { message?: string };
@@ -47,193 +49,6 @@ type DimensionErrors = {
   heightCm?: { message?: string };
   packageCount?: { message?: string };
 };
-
-function PackageMetricsPanel({
-  register,
-  errors,
-  shipmentType,
-  lengthCm,
-  widthCm,
-  heightCm,
-  packageCount,
-  onWeightChange,
-  idPrefix = "",
-}: {
-  register: ReturnType<typeof useForm<CreateShipmentInput>>["register"];
-  errors: DimensionErrors;
-  shipmentType?: ShipmentType;
-  lengthCm?: number;
-  widthCm?: number;
-  heightCm?: number;
-  packageCount?: number;
-  onWeightChange?: (weight: number) => void;
-  idPrefix?: string;
-}) {
-  const showContainer = shipmentType ? usesContainerCapacity(shipmentType) : false;
-  const [containerType, setContainerType] = useState<ContainerType>("CONTAINER_40FT");
-
-  useEffect(() => {
-    if (shipmentType) {
-      setContainerType(defaultContainerType(shipmentType));
-    }
-  }, [shipmentType]);
-
-  const metrics = useMemo(() => {
-    if (
-      !lengthCm ||
-      !widthCm ||
-      !heightCm ||
-      lengthCm <= 0 ||
-      widthCm <= 0 ||
-      heightCm <= 0
-    ) {
-      return null;
-    }
-
-    const count = packageCount && packageCount > 0 ? packageCount : 1;
-    const containerCbm = CONTAINER_CAPACITIES[containerType].cbm;
-
-    return analyzePackageMetrics({
-      lengthCm,
-      widthCm,
-      heightCm,
-      packageCount: count,
-      containerCbm,
-    });
-  }, [lengthCm, widthCm, heightCm, packageCount, containerType]);
-
-  useEffect(() => {
-    if (metrics && onWeightChange) {
-      onWeightChange(metrics.volumetricWeightKg);
-    }
-  }, [metrics, onWeightChange]);
-
-  const containerStatusClass = metrics
-    ? metrics.overflowPackages > 0
-      ? "border-destructive/40 bg-destructive/5 text-destructive"
-      : metrics.isFull
-        ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-700"
-        : "border-amber-500/40 bg-amber-500/5 text-amber-800"
-    : "border-dashed border-input bg-muted/40 text-muted-foreground";
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border p-3">
-      <div>
-        <p className="text-sm font-medium">Package Dimensions</p>
-        <p className="text-xs text-muted-foreground">
-          Enter size in centimeters (cm). Weight is calculated from volume.
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}lengthCm`}>Length (cm)</Label>
-          <Input
-            id={`${idPrefix}lengthCm`}
-            type="number"
-            step="0.1"
-            min="0"
-            {...register("lengthCm", { valueAsNumber: true })}
-          />
-          {errors.lengthCm && (
-            <p className="text-sm text-destructive">{String(errors.lengthCm.message)}</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}widthCm`}>Width (cm)</Label>
-          <Input
-            id={`${idPrefix}widthCm`}
-            type="number"
-            step="0.1"
-            min="0"
-            {...register("widthCm", { valueAsNumber: true })}
-          />
-          {errors.widthCm && (
-            <p className="text-sm text-destructive">{String(errors.widthCm.message)}</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}heightCm`}>Height (cm)</Label>
-          <Input
-            id={`${idPrefix}heightCm`}
-            type="number"
-            step="0.1"
-            min="0"
-            {...register("heightCm", { valueAsNumber: true })}
-          />
-          {errors.heightCm && (
-            <p className="text-sm text-destructive">{String(errors.heightCm.message)}</p>
-          )}
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}packageCount`}>Package Count</Label>
-          <Input
-            id={`${idPrefix}packageCount`}
-            type="number"
-            step="1"
-            min="1"
-            defaultValue={idPrefix ? undefined : 1}
-            {...register("packageCount", { valueAsNumber: true })}
-          />
-          {errors.packageCount && (
-            <p className="text-sm text-destructive">{String(errors.packageCount.message)}</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label>Calculated CBM</Label>
-          <div className="flex h-8 items-center rounded-lg border border-dashed border-input bg-muted/40 px-2.5 text-sm font-medium">
-            {metrics ? formatCbm(metrics.totalCbm) : "Enter dimensions"}
-          </div>
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label>Volumetric Weight</Label>
-          <div className="flex h-8 items-center rounded-lg border border-dashed border-input bg-muted/40 px-2.5 text-sm font-medium">
-            {metrics ? `${metrics.volumetricWeightKg.toFixed(2)} kg` : "Enter dimensions"}
-          </div>
-        </div>
-        {showContainer && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`${idPrefix}containerType`}>Container</Label>
-            <select
-              id={`${idPrefix}containerType`}
-              className={selectClass}
-              value={containerType}
-              onChange={(event) => setContainerType(event.target.value as ContainerType)}
-            >
-              {Object.entries(CONTAINER_CAPACITIES).map(([key, spec]) => (
-                <option key={key} value={key}>
-                  {spec.label} ({spec.cbm} m³)
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-      {showContainer && (
-        <div className="flex flex-col gap-2">
-          <Label>Container Status</Label>
-          <div
-            className={cn(
-              "rounded-lg border px-2.5 py-2 text-sm font-medium",
-              containerStatusClass
-            )}
-          >
-            {metrics ? formatContainerStatus(metrics) : "Enter dimensions to check container fill"}
-          </div>
-          {metrics && metrics.maxPackages > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Fits up to {metrics.maxPackages} package{metrics.maxPackages === 1 ? "" : "s"} of this
-              size in the selected container ({metrics.singlePackageCbm.toFixed(3)} m³ each).
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 interface ShipmentFormDialogProps {
   open: boolean;
@@ -303,7 +118,7 @@ function ShipmentCreateForm({
     formState: { errors },
   } = useForm<CreateShipmentInput>({
     defaultValues: {
-      shipmentType: ShipmentType.STANDARD,
+      shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
       packageCount: 1,
       origin: "",
       destination: "",
@@ -311,21 +126,58 @@ function ShipmentCreateForm({
       warehouseId: "",
       scheduledPickup: "",
       notes: "",
+      requestPickup: false,
+      requestDelivery: false,
+      pickupAddress: "",
+      deliveryAddress: "",
+      hasInsurance: false,
+      acceptedTerms: false,
     },
   });
 
   const [isCreating, setIsCreating] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [staffMode, setStaffMode] = useState<"create" | "link">("create");
 
   const shipmentType = watch("shipmentType");
   const lengthCm = watch("lengthCm");
   const widthCm = watch("widthCm");
   const heightCm = watch("heightCm");
   const packageCount = watch("packageCount");
+  const requestPickup = watch("requestPickup");
+  const requestDelivery = watch("requestDelivery");
+  const hasInsurance = watch("hasInsurance");
+  const declaredValue = watch("declaredValue");
+  const weight = watch("weight");
+
+  const shipmentTypeOptions = getShipmentTypeOptions(isCustomer);
+
+  const costEstimate = useMemo(() => {
+    if (!isCustomer || !shipmentType || !weight || weight <= 0) return null;
+    return calculateShipmentInvoiceBreakdown({
+      shipmentType,
+      weight,
+      requestPickup: !!requestPickup,
+      requestDelivery: !!requestDelivery,
+      hasInsurance: !!hasInsurance,
+      declaredValue,
+    });
+  }, [
+    isCustomer,
+    shipmentType,
+    weight,
+    requestPickup,
+    requestDelivery,
+    hasInsurance,
+    declaredValue,
+  ]);
 
   useEffect(() => {
     if (open) {
+      setAcceptedTerms(false);
+      setStaffMode("create");
       reset({
-        shipmentType: ShipmentType.STANDARD,
+        shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
         weight: undefined,
         lengthCm: undefined,
         widthCm: undefined,
@@ -337,6 +189,13 @@ function ShipmentCreateForm({
         warehouseId: "",
         scheduledPickup: "",
         notes: "",
+        requestPickup: false,
+        requestDelivery: false,
+        pickupAddress: "",
+        deliveryAddress: "",
+        hasInsurance: false,
+        declaredValue: undefined,
+        acceptedTerms: false,
       });
     }
   }, [open, reset]);
@@ -344,6 +203,11 @@ function ShipmentCreateForm({
   async function handleCreateClick() {
     if (isCreating) return;
     clearErrors();
+
+    if (isCustomer && !acceptedTerms) {
+      toast.error("You must accept the terms and conditions");
+      return;
+    }
 
     const values = getValues();
 
@@ -367,6 +231,9 @@ function ShipmentCreateForm({
       warehouseId: values.warehouseId?.trim() || undefined,
       notes: values.notes?.trim() || undefined,
       scheduledPickup: values.scheduledPickup?.trim() || undefined,
+      pickupAddress: values.pickupAddress?.trim() || undefined,
+      deliveryAddress: values.deliveryAddress?.trim() || undefined,
+      acceptedTerms: isCustomer ? acceptedTerms : undefined,
     });
 
     if (!parsed.success) {
@@ -404,11 +271,44 @@ function ShipmentCreateForm({
   return (
     <div className="flex flex-col gap-4">
       {!isCustomer && (
+        <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1">
+          <button
+            type="button"
+            className={cn(
+              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              staffMode === "create"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setStaffMode("create")}
+          >
+            Enter details
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              staffMode === "link"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setStaffMode("link")}
+          >
+            Customer intake link
+          </button>
+        </div>
+      )}
+
+      {!isCustomer && staffMode === "link" ? (
+        <ShipmentIntakeLinkPanel role={role} onClose={() => onOpenChange(false)} />
+      ) : (
+        <>
+      {!isCustomer && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="customerId">
             Customer <span className="text-destructive">*</span>
           </Label>
-          <select id="customerId" className={selectClass} {...register("customerId")}>
+          <select id="customerId" className={formSelectClass} {...register("customerId")}>
             <option value="">Select customer</option>
             {customers?.map((c: { id: string; companyName: string }) => (
               <option key={c.id} value={c.id}>
@@ -425,7 +325,7 @@ function ShipmentCreateForm({
       {!isCustomer && showWarehouseField && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="warehouseId">Warehouse Branch</Label>
-          <select id="warehouseId" className={selectClass} {...register("warehouseId")}>
+          <select id="warehouseId" className={formSelectClass} {...register("warehouseId")}>
             <option value="">Assign later</option>
             {warehouses?.map((w: { id: string; code: string; name: string }) => (
               <option key={w.id} value={w.id}>
@@ -437,11 +337,11 @@ function ShipmentCreateForm({
       )}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="shipmentType">Type</Label>
-        <select id="shipmentType" className={selectClass} {...register("shipmentType")}>
-          {Object.values(ShipmentType).map((t) => (
-            <option key={t} value={t}>
-              {t.replace(/_/g, " ")}
+        <Label htmlFor="shipmentType">Type of Shipment</Label>
+        <select id="shipmentType" className={formSelectClass} {...register("shipmentType")}>
+          {shipmentTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -456,6 +356,7 @@ function ShipmentCreateForm({
         heightCm={heightCm}
         packageCount={packageCount}
         onWeightChange={(weight) => setValue("weight", weight)}
+        showContainerDetails={!isCustomer}
       />
 
       <div className="flex flex-col gap-2">
@@ -472,17 +373,160 @@ function ShipmentCreateForm({
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="scheduledPickup">Scheduled Pickup</Label>
-        <Input id="scheduledPickup" type="datetime-local" {...register("scheduledPickup")} />
-      </div>
+      {isCustomer && (
+        <div className="space-y-3 rounded-lg border border-dashed p-3">
+          <div>
+            <p className="text-sm font-medium">Door services</p>
+            <p className="text-xs text-muted-foreground">
+              Optional pickup and delivery by our logistics team. Fees are billed separately from
+              freight ({formatCurrency(PICKUP_SERVICE_FEE)} pickup ·{" "}
+              {formatCurrency(DELIVERY_SERVICE_FEE)} delivery).
+            </p>
+          </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" {...register("requestPickup")} />
+            <span>Request door pickup — we collect the package from your location</span>
+          </label>
+          {requestPickup && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="pickupAddress">Pickup address</Label>
+              <Input
+                id="pickupAddress"
+                placeholder="Street, city, postal code"
+                {...register("pickupAddress")}
+              />
+              {errors.pickupAddress && (
+                <p className="text-sm text-destructive">{errors.pickupAddress.message}</p>
+              )}
+            </div>
+          )}
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" {...register("requestDelivery")} />
+            <span>Request door delivery — we deliver to the recipient at destination</span>
+          </label>
+          {requestDelivery && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="deliveryAddress">Delivery address</Label>
+              <Input
+                id="deliveryAddress"
+                placeholder="Street, city, postal code"
+                {...register("deliveryAddress")}
+              />
+              {errors.deliveryAddress && (
+                <p className="text-sm text-destructive">{errors.deliveryAddress.message}</p>
+              )}
+            </div>
+          )}
+          {requestPickup && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="scheduledPickup">Preferred pickup date & time</Label>
+              <Input id="scheduledPickup" type="datetime-local" {...register("scheduledPickup")} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isCustomer && (
+        <div className="space-y-3 rounded-lg border border-dashed p-3">
+          <div>
+            <p className="text-sm font-medium">Insurance coverage</p>
+            <p className="text-xs text-muted-foreground">
+              Optional cargo insurance based on declared value (minimum premium applies).
+            </p>
+          </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" {...register("hasInsurance")} />
+            <span>Add insurance coverage for this shipment</span>
+          </label>
+          {hasInsurance && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="declaredValue">Declared value (USD)</Label>
+              <Input
+                id="declaredValue"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="1000"
+                {...register("declaredValue", { valueAsNumber: true })}
+              />
+              {errors.declaredValue && (
+                <p className="text-sm text-destructive">{errors.declaredValue.message}</p>
+              )}
+              {declaredValue && declaredValue > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Estimated insurance: {formatCurrency(calculateInsuranceCost(declaredValue))}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isCustomer && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="scheduledPickup">Scheduled Pickup</Label>
+          <Input id="scheduledPickup" type="datetime-local" {...register("scheduledPickup")} />
+        </div>
+      )}
+
+      {isCustomer && costEstimate && (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+          <p className="font-medium">Estimated invoice</p>
+          <div className="mt-2 space-y-1 text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Freight</span>
+              <span>{formatCurrency(costEstimate.baseAmount)}</span>
+            </div>
+            {costEstimate.pickupCost > 0 && (
+              <div className="flex justify-between">
+                <span>Door pickup</span>
+                <span>{formatCurrency(costEstimate.pickupCost)}</span>
+              </div>
+            )}
+            {costEstimate.deliveryCost > 0 && (
+              <div className="flex justify-between">
+                <span>Door delivery</span>
+                <span>{formatCurrency(costEstimate.deliveryCost)}</span>
+              </div>
+            )}
+            {costEstimate.insuranceCost > 0 && (
+              <div className="flex justify-between">
+                <span>Insurance</span>
+                <span>{formatCurrency(costEstimate.insuranceCost)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t pt-1 font-medium text-foreground">
+              <span>Total (incl. tax)</span>
+              <span>{formatCurrency(costEstimate.totalAmount)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCustomer && (
+        <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={acceptedTerms}
+            onChange={(event) => setAcceptedTerms(event.target.checked)}
+          />
+          <span>
+            I have read and agree to the{" "}
+            <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">
+              Terms and Conditions
+            </Link>
+            .
+          </span>
+        </label>
+      )}
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="notes">Notes</Label>
         <textarea
           id="notes"
           rows={3}
-          className={cn(selectClass, "h-auto py-2 resize-none")}
+          className={cn(formSelectClass, "h-auto py-2 resize-none")}
           placeholder="Optional instructions or notes"
           {...register("notes")}
         />
@@ -492,10 +536,12 @@ function ShipmentCreateForm({
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button type="button" disabled={isCreating} onClick={() => void handleCreateClick()}>
+        <Button type="button" disabled={isCreating || (isCustomer && !acceptedTerms)} onClick={() => void handleCreateClick()}>
           {isCreating ? "Creating..." : "Create Shipment"}
         </Button>
       </DialogFooter>
+        </>
+      )}
     </div>
   );
 }
@@ -598,10 +644,10 @@ function ShipmentEditForm({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="edit-shipmentType">Type</Label>
-        <select id="edit-shipmentType" className={selectClass} {...register("shipmentType")}>
-          {Object.values(ShipmentType).map((t) => (
-            <option key={t} value={t}>
-              {t.replace(/_/g, " ")}
+        <select id="edit-shipmentType" className={formSelectClass} {...register("shipmentType")}>
+          {getShipmentTypeOptions(false).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -639,7 +685,7 @@ function ShipmentEditForm({
       {showWarehouseField && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="edit-warehouseId">Warehouse Branch</Label>
-          <select id="edit-warehouseId" className={selectClass} {...register("warehouseId")}>
+          <select id="edit-warehouseId" className={formSelectClass} {...register("warehouseId")}>
             <option value="">Unassigned</option>
             {warehouses?.map((w: { id: string; code: string; name: string }) => (
               <option key={w.id} value={w.id}>
@@ -653,7 +699,7 @@ function ShipmentEditForm({
       {canChangeStatus && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="edit-status">Status</Label>
-          <select id="edit-status" className={selectClass} {...register("status")}>
+          <select id="edit-status" className={formSelectClass} {...register("status")}>
             {Object.values(ShipmentStatus).map((s) => (
               <option key={s} value={s}>
                 {SHIPMENT_STATUS_LABELS[s] ?? s}
@@ -683,7 +729,7 @@ function ShipmentEditForm({
         <textarea
           id="edit-notes"
           rows={3}
-          className={cn(selectClass, "h-auto py-2 resize-none")}
+          className={cn(formSelectClass, "h-auto py-2 resize-none")}
           placeholder="Optional instructions or notes"
           {...register("notes")}
         />
@@ -707,7 +753,9 @@ export function ShipmentFormDialog({
   shipmentId,
   onSuccess,
 }: ShipmentFormDialogProps) {
-  const isEdit = !!shipmentId;
+  const { data: session } = useSession();
+  const isCustomer = session?.user?.role === UserRole.CUSTOMER;
+  const isEdit = !!shipmentId && !isCustomer;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -715,7 +763,11 @@ export function ShipmentFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Shipment" : "New Shipment"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? "Update shipment details and status." : "Create a new shipment request."}
+            {isEdit
+              ? "Update shipment details and status."
+              : isCustomer
+                ? "Submit a shipment request. Review optional services and accept terms before booking."
+                : "Create a shipment directly or generate a link for a new customer to submit their details."}
           </DialogDescription>
         </DialogHeader>
 

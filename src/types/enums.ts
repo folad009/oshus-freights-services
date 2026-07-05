@@ -28,9 +28,8 @@ export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus];
 export const ShipmentType = {
   DOMESTIC: "DOMESTIC",
   INTERNATIONAL: "INTERNATIONAL",
-  EXPRESS: "EXPRESS",
-  STANDARD: "STANDARD",
-  FREIGHT: "FREIGHT",
+  STANDARD_AIR_FREIGHT: "STANDARD_AIR_FREIGHT",
+  STANDARD_SEA_FREIGHT: "STANDARD_SEA_FREIGHT",
   BULK_CARGO: "BULK_CARGO",
 } as const;
 

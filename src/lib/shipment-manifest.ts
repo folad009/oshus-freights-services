@@ -1,4 +1,5 @@
 import { formatCbm, formatDate } from "@/lib/helpers";
+import { getShipmentTypeLabel } from "@/lib/shipment-types";
 
 export type ShipmentManifestData = {
   id: string;
@@ -51,7 +52,7 @@ export function shipmentToManifestData(shipment: {
   return {
     id: shipment.id,
     trackingNumber: shipment.trackingNumber,
-    shipmentType: shipment.shipmentType.replace(/_/g, " "),
+    shipmentType: getShipmentTypeLabel(shipment.shipmentType as never),
     status: shipment.status.replace(/_/g, " "),
     origin: shipment.origin,
     destination: shipment.destination,

@@ -5,7 +5,13 @@ import { successResponse, errorResponse, handleApiError } from "@/lib/api-respon
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { createShipmentSchema, updateShipmentSchema } from "@/lib/validations";
 import { createAuditLog, generateTrackingNumber, getCustomerIdForUser, calculateCbm } from "@/lib/helpers";
-import { createInvoiceForShipment } from "@/lib/billing";
+import {
+  createInvoiceForShipment,
+  calculateInsuranceCost,
+  PICKUP_SERVICE_FEE,
+  DELIVERY_SERVICE_FEE,
+  TERMS_VERSION,
+} from "@/lib/billing";
 import { notifyShipmentCreated } from "@/lib/notifications";
 import {
   getWarehouseScope,
@@ -74,6 +80,9 @@ export async function POST(req: NextRequest) {
     if (user.role === UserRole.CUSTOMER) {
       customerId = (await getCustomerIdForUser(user.id)) ?? undefined;
       if (!customerId) return errorResponse("Customer profile not found", 404);
+      if (!parsed.data.acceptedTerms) {
+        return errorResponse("You must accept the terms and conditions");
+      }
     }
     if (!customerId) return errorResponse("Customer ID is required");
 
@@ -96,6 +105,16 @@ export async function POST(req: NextRequest) {
       packageCount: parsed.data.packageCount,
     });
 
+    const requestPickup = parsed.data.requestPickup ?? false;
+    const requestDelivery = parsed.data.requestDelivery ?? false;
+    const hasInsurance = parsed.data.hasInsurance ?? false;
+    const pickupServiceCost = requestPickup ? PICKUP_SERVICE_FEE : null;
+    const deliveryServiceCost = requestDelivery ? DELIVERY_SERVICE_FEE : null;
+    const insuranceCost =
+      hasInsurance && parsed.data.declaredValue
+        ? calculateInsuranceCost(parsed.data.declaredValue)
+        : null;
+
     const shipment = await db.shipment.create({
       data: {
         trackingNumber: generateTrackingNumber(),
@@ -114,6 +133,17 @@ export async function POST(req: NextRequest) {
           ? new Date(parsed.data.scheduledPickup)
           : undefined,
         notes: parsed.data.notes,
+        requestPickup,
+        requestDelivery,
+        pickupAddress: requestPickup ? parsed.data.pickupAddress?.trim() ?? null : null,
+        deliveryAddress: requestDelivery ? parsed.data.deliveryAddress?.trim() ?? null : null,
+        pickupServiceCost,
+        deliveryServiceCost,
+        hasInsurance,
+        declaredValue: hasInsurance ? parsed.data.declaredValue ?? null : null,
+        insuranceCost,
+        termsAcceptedAt: user.role === UserRole.CUSTOMER ? new Date() : null,
+        termsVersion: user.role === UserRole.CUSTOMER ? TERMS_VERSION : null,
         events: {
           create: {
             eventType: ShipmentStatus.DRAFT,
@@ -148,6 +178,10 @@ export async function POST(req: NextRequest) {
         weight: shipment.weight,
         trackingNumber: shipment.trackingNumber,
         userId: user.id,
+        requestPickup,
+        requestDelivery,
+        hasInsurance,
+        declaredValue: shipment.declaredValue,
       });
     }
 

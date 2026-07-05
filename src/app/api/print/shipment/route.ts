@@ -4,6 +4,7 @@ import { successResponse, errorResponse, handleApiError } from "@/lib/api-respon
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { assertShipmentWarehouseAccess, WarehouseAccessError } from "@/lib/warehouse-scope";
 import { printManifestEscPosToNetwork } from "@/lib/xprinter-server";
+import { UserRole } from "@/types/enums";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -15,6 +16,9 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthContext("shipments:read");
+    if (user.role === UserRole.CUSTOMER) {
+      return errorResponse("Customers cannot print shipment labels", 403);
+    }
     const body = await req.json();
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? "Invalid request");
