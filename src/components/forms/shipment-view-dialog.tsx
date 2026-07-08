@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ShipmentBarcode } from "@/components/shipment-barcode";
 import { formatCurrency, formatDate, formatCbm } from "@/lib/helpers";
 import { getShipmentTypeLabel } from "@/lib/shipment-types";
+import { getGovernmentIdTypeLabel } from "@/lib/id-document";
 
 interface ShipmentViewDialogProps {
   open: boolean;
@@ -44,6 +45,9 @@ type ShipmentDetails = {
   scheduledPickup: string | null;
   estimatedDelivery: string | null;
   notes: string | null;
+  idDocumentType: string | null;
+  idDocumentOriginalName: string | null;
+  idDocumentUploadedAt: string | null;
   createdAt: string;
   invoices: Array<{ id: string; invoiceNumber: string; totalAmount: number; status: string }>;
   events: Array<{ eventType: string; location: string; timestamp: string; notes: string | null }>;
@@ -149,6 +153,32 @@ export function ShipmentViewDialog({ open, onOpenChange, shipmentId }: ShipmentV
                 <DetailRow
                   label="Insurance cost"
                   value={shipment.insuranceCost != null ? formatCurrency(shipment.insuranceCost) : "—"}
+                />
+              </div>
+            )}
+
+            {shipment.idDocumentType && (
+              <div className="flex flex-col gap-3 rounded-lg border border-dashed p-3">
+                <p className="text-sm font-medium">Government ID</p>
+                <DetailRow
+                  label="Document type"
+                  value={getGovernmentIdTypeLabel(shipment.idDocumentType)}
+                />
+                {shipment.idDocumentUploadedAt && (
+                  <DetailRow label="Uploaded" value={formatDate(shipment.idDocumentUploadedAt)} />
+                )}
+                <DetailRow
+                  label="Document"
+                  value={
+                    <Link
+                      href={`/api/shipments/${shipment.id}/id-document`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {shipment.idDocumentOriginalName ?? "View ID document"}
+                    </Link>
+                  }
                 />
               </div>
             )}

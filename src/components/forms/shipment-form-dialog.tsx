@@ -24,7 +24,7 @@ import {
   type CreateShipmentInput,
   type UpdateShipmentInput,
 } from "@/lib/validations";
-import { ShipmentType, ShipmentStatus } from "@/types/enums";
+import { ShipmentType, ShipmentStatus, GovernmentIdType } from "@/types/enums";
 import {
   calculateInsuranceCost,
   calculateShipmentInvoiceBreakdown,
@@ -41,6 +41,11 @@ import {
   formSelectClass,
 } from "@/components/forms/shipment-package-metrics-panel";
 import { ShipmentIntakeLinkPanel } from "@/components/forms/shipment-intake-link-panel";
+import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
+import {
+  IdDocumentUploadField,
+  uploadCustomerIdDocument,
+} from "@/components/forms/id-document-upload-field";
 import { cn } from "@/lib/utils";
 
 type DimensionErrors = {
@@ -138,6 +143,9 @@ function ShipmentCreateForm({
   const [isCreating, setIsCreating] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [staffMode, setStaffMode] = useState<"create" | "link">("create");
+  const [idDocumentType, setIdDocumentType] = useState<GovernmentIdType | "">("");
+  const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
+  const [idDocumentError, setIdDocumentError] = useState("");
 
   const shipmentType = watch("shipmentType");
   const lengthCm = watch("lengthCm");
@@ -176,6 +184,9 @@ function ShipmentCreateForm({
     if (open) {
       setAcceptedTerms(false);
       setStaffMode("create");
+      setIdDocumentType("");
+      setIdDocumentFile(null);
+      setIdDocumentError("");
       reset({
         shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
         weight: undefined,
@@ -207,6 +218,20 @@ function ShipmentCreateForm({
     if (isCustomer && !acceptedTerms) {
       toast.error("You must accept the terms and conditions");
       return;
+    }
+
+    if (isCustomer) {
+      if (!idDocumentType) {
+        setIdDocumentError("Select the type of ID you are uploading");
+        toast.error("Government ID type is required");
+        return;
+      }
+      if (!idDocumentFile) {
+        setIdDocumentError("Upload a valid government-issued ID document");
+        toast.error("Government ID upload is required");
+        return;
+      }
+      setIdDocumentError("");
     }
 
     const values = getValues();
@@ -248,10 +273,23 @@ function ShipmentCreateForm({
 
     setIsCreating(true);
     try {
+      let idDocumentStorageKey: string | undefined;
+      let uploadedIdDocumentType: GovernmentIdType | undefined;
+
+      if (isCustomer && idDocumentFile && idDocumentType) {
+        const uploaded = await uploadCustomerIdDocument(idDocumentFile, idDocumentType);
+        idDocumentStorageKey = uploaded.storageKey;
+        uploadedIdDocumentType = uploaded.idDocumentType;
+      }
+
       const res = await fetch("/api/shipments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({
+          ...parsed.data,
+          idDocumentStorageKey,
+          idDocumentType: uploadedIdDocumentType,
+        }),
       });
       const json = await res.json();
       if (!json.success) {
@@ -275,7 +313,7 @@ function ShipmentCreateForm({
           <button
             type="button"
             className={cn(
-              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "rounded-md px-3 py-2.5 text-base font-medium transition-colors",
               staffMode === "create"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -287,7 +325,7 @@ function ShipmentCreateForm({
           <button
             type="button"
             className={cn(
-              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "rounded-md px-3 py-2.5 text-base font-medium transition-colors",
               staffMode === "link"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -376,15 +414,15 @@ function ShipmentCreateForm({
       {isCustomer && (
         <div className="space-y-3 rounded-lg border border-dashed p-3">
           <div>
-            <p className="text-sm font-medium">Door services</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base font-medium">Door services</p>
+            <p className="text-sm text-muted-foreground">
               Optional pickup and delivery by our logistics team. Fees are billed separately from
               freight ({formatCurrency(PICKUP_SERVICE_FEE)} pickup ·{" "}
               {formatCurrency(DELIVERY_SERVICE_FEE)} delivery).
             </p>
           </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-1" {...register("requestPickup")} />
+          <label className="flex items-start gap-2 text-base">
+            <input type="checkbox" className="mt-1 size-4" {...register("requestPickup")} />
             <span>Request door pickup — we collect the package from your location</span>
           </label>
           {requestPickup && (
@@ -400,8 +438,8 @@ function ShipmentCreateForm({
               )}
             </div>
           )}
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-1" {...register("requestDelivery")} />
+          <label className="flex items-start gap-2 text-base">
+            <input type="checkbox" className="mt-1 size-4" {...register("requestDelivery")} />
             <span>Request door delivery — we deliver to the recipient at destination</span>
           </label>
           {requestDelivery && (
@@ -429,13 +467,13 @@ function ShipmentCreateForm({
       {isCustomer && (
         <div className="space-y-3 rounded-lg border border-dashed p-3">
           <div>
-            <p className="text-sm font-medium">Insurance coverage</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base font-medium">Insurance coverage</p>
+            <p className="text-sm text-muted-foreground">
               Optional cargo insurance based on declared value (minimum premium applies).
             </p>
           </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-1" {...register("hasInsurance")} />
+          <label className="flex items-start gap-2 text-base">
+            <input type="checkbox" className="mt-1 size-4" {...register("hasInsurance")} />
             <span>Add insurance coverage for this shipment</span>
           </label>
           {hasInsurance && (
@@ -453,7 +491,7 @@ function ShipmentCreateForm({
                 <p className="text-sm text-destructive">{errors.declaredValue.message}</p>
               )}
               {declaredValue && declaredValue > 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Estimated insurance: {formatCurrency(calculateInsuranceCost(declaredValue))}
                 </p>
               )}
@@ -470,7 +508,7 @@ function ShipmentCreateForm({
       )}
 
       {isCustomer && costEstimate && (
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+        <div className="rounded-lg border bg-muted/40 p-3 text-base">
           <p className="font-medium">Estimated invoice</p>
           <div className="mt-2 space-y-1 text-muted-foreground">
             <div className="flex justify-between">
@@ -504,21 +542,17 @@ function ShipmentCreateForm({
       )}
 
       {isCustomer && (
-        <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={acceptedTerms}
-            onChange={(event) => setAcceptedTerms(event.target.checked)}
-          />
-          <span>
-            I have read and agree to the{" "}
-            <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">
-              Terms and Conditions
-            </Link>
-            .
-          </span>
-        </label>
+        <IdDocumentUploadField
+          idDocumentType={idDocumentType}
+          onIdDocumentTypeChange={setIdDocumentType}
+          selectedFile={idDocumentFile}
+          onSelectedFileChange={setIdDocumentFile}
+          error={idDocumentError}
+        />
+      )}
+
+      {isCustomer && (
+        <TermsAcceptanceField checked={acceptedTerms} onChange={setAcceptedTerms} />
       )}
 
       <div className="flex flex-col gap-2">

@@ -49,6 +49,15 @@ export const ShipmentStatus = {
 
 export type ShipmentStatus = (typeof ShipmentStatus)[keyof typeof ShipmentStatus];
 
+export const GovernmentIdType = {
+  INTERNATIONAL_PASSPORT: "INTERNATIONAL_PASSPORT",
+  DRIVERS_LICENSE: "DRIVERS_LICENSE",
+  NATIONAL_ID: "NATIONAL_ID",
+  OTHER_GOVERNMENT_ID: "OTHER_GOVERNMENT_ID",
+} as const;
+
+export type GovernmentIdType = (typeof GovernmentIdType)[keyof typeof GovernmentIdType];
+
 export const InventoryCategory = {
   PACKAGING_MATERIALS: "PACKAGING_MATERIALS",
   GOODS: "GOODS",

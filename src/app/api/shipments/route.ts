@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ShipmentStatus, UserRole } from "@/types/enums";
+import { ShipmentStatus, UserRole, GovernmentIdType } from "@/types/enums";
 import { db } from "@/lib/db";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
 import { getAuthContext, AuthError } from "@/lib/api-auth";
@@ -13,6 +13,7 @@ import {
   TERMS_VERSION,
 } from "@/lib/billing";
 import { notifyShipmentCreated } from "@/lib/notifications";
+import { attachPendingIdDocument } from "@/lib/id-document-storage";
 import {
   getWarehouseScope,
   buildWarehouseIdFilter,
@@ -82,6 +83,9 @@ export async function POST(req: NextRequest) {
       if (!customerId) return errorResponse("Customer profile not found", 404);
       if (!parsed.data.acceptedTerms) {
         return errorResponse("You must accept the terms and conditions");
+      }
+      if (!parsed.data.idDocumentType || !parsed.data.idDocumentStorageKey?.trim()) {
+        return errorResponse("A valid government-issued ID document is required");
       }
     }
     if (!customerId) return errorResponse("Customer ID is required");
@@ -157,6 +161,24 @@ export async function POST(req: NextRequest) {
         warehouse: { select: { code: true, name: true } },
       },
     });
+
+    if (
+      user.role === UserRole.CUSTOMER &&
+      parsed.data.idDocumentType &&
+      parsed.data.idDocumentStorageKey
+    ) {
+      const idDocument = await attachPendingIdDocument({
+        storageKey: parsed.data.idDocumentStorageKey.trim(),
+        userId: user.id,
+        shipmentId: shipment.id,
+        idDocumentType: parsed.data.idDocumentType as GovernmentIdType,
+      });
+
+      await db.shipment.update({
+        where: { id: shipment.id },
+        data: idDocument,
+      });
+    }
 
     await createAuditLog({
       userId: user.id,

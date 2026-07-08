@@ -8,6 +8,8 @@ import {
   PaymentMethod,
   TicketCategory,
   UserRole,
+  GovernmentIdType,
+  UserStatus,
 } from "@/types/enums";
 
 export const loginSchema = z.object({
@@ -15,13 +17,55 @@ export const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-export const createUserSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
-  role: z.nativeEnum(UserRole),
-});
+export const createUserSchema = z
+  .object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    role: z.nativeEnum(UserRole),
+    licenseNumber: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === UserRole.CUSTOMER) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Create customer accounts from the Customers page",
+        path: ["role"],
+      });
+    }
+    if (data.role === UserRole.DRIVER && !data.licenseNumber?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "License number is required for drivers",
+        path: ["licenseNumber"],
+      });
+    }
+  });
+
+export const updateUserSchema = z
+  .object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    email: z.string().email("Invalid email address"),
+    role: z.nativeEnum(UserRole),
+    status: z.nativeEnum(UserStatus),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .optional()
+      .or(z.literal("")),
+    licenseNumber: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === UserRole.DRIVER && !data.licenseNumber?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "License number is required for drivers",
+        path: ["licenseNumber"],
+      });
+    }
+  });
 
 export const createCustomerSchema = z.object({
   companyName: z.string().min(1),
@@ -101,6 +145,8 @@ export const createShipmentSchema = shipmentCoreFieldsSchema
     customerId: z.string().optional(),
     warehouseId: z.string().optional(),
     acceptedTerms: z.boolean().optional(),
+    idDocumentType: z.nativeEnum(GovernmentIdType).optional(),
+    idDocumentStorageKey: z.string().min(1).optional(),
   })
   .superRefine(shipmentServiceRefinement);
 
@@ -238,6 +284,8 @@ export const submitShipmentIntakeSchema = shipmentIntakeCustomerFields
   .superRefine(shipmentServiceRefinement);
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateShipmentInput = z.infer<typeof createShipmentSchema>;
 export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>;
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;

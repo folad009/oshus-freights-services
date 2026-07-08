@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const formSelectClass =
-  "flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  "flex h-10 w-full rounded-lg border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 type DimensionErrors = {
   lengthCm?: { message?: string };
@@ -101,8 +101,8 @@ export function PackageMetricsPanel<T extends FieldValues>({
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
       <div>
-        <p className="text-sm font-medium">Package Dimensions</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-base font-medium">Package Dimensions</p>
+        <p className="text-sm text-muted-foreground">
           Enter size in centimeters (cm). Weight is calculated from volume.
         </p>
       </div>
@@ -164,7 +164,7 @@ export function PackageMetricsPanel<T extends FieldValues>({
         </div>
         <div className="flex flex-col gap-2">
           <Label>Calculated CBM</Label>
-          <div className="flex h-8 items-center rounded-lg border border-dashed border-input bg-muted/40 px-2.5 text-sm font-medium">
+          <div className="flex h-10 items-center rounded-lg border border-dashed border-input bg-muted/40 px-3 text-base font-medium">
             {metrics ? formatCbm(metrics.totalCbm) : "Enter dimensions"}
           </div>
         </div>
@@ -172,7 +172,7 @@ export function PackageMetricsPanel<T extends FieldValues>({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label>Volumetric Weight</Label>
-          <div className="flex h-8 items-center rounded-lg border border-dashed border-input bg-muted/40 px-2.5 text-sm font-medium">
+          <div className="flex h-10 items-center rounded-lg border border-dashed border-input bg-muted/40 px-3 text-base font-medium">
             {metrics ? `${metrics.volumetricWeightKg.toFixed(2)} kg` : "Enter dimensions"}
           </div>
         </div>
@@ -199,14 +199,14 @@ export function PackageMetricsPanel<T extends FieldValues>({
           <Label>Container Status</Label>
           <div
             className={cn(
-              "rounded-lg border px-2.5 py-2 text-sm font-medium",
+              "rounded-lg border px-3 py-2.5 text-base font-medium",
               containerStatusClass
             )}
           >
             {metrics ? formatContainerStatus(metrics) : "Enter dimensions to check container fill"}
           </div>
           {metrics && metrics.maxPackages > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Fits up to {metrics.maxPackages} package{metrics.maxPackages === 1 ? "" : "s"} of this
               size in the selected container ({metrics.singlePackageCbm.toFixed(3)} m³ each).
             </p>

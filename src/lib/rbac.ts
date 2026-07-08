@@ -22,6 +22,17 @@ export const ROLE_DASHBOARD_PATH: Record<UserRole, string> = {
   FRONT_DESK: "/dashboard/front-desk",
 };
 
+/** Roles admins can create from the Users page (customers use Customers page). */
+export const STAFF_USER_ROLES = [
+  UserRole.ADMIN,
+  UserRole.WAREHOUSE_STAFF,
+  UserRole.DRIVER,
+  UserRole.DISPATCHER,
+  UserRole.FINANCE_OFFICER,
+  UserRole.MARKETING,
+  UserRole.FRONT_DESK,
+] as const;
+
 export type Permission =
   | "shipments:read"
   | "shipments:write"

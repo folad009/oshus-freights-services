@@ -56,18 +56,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### Demo Accounts
 
-All accounts use password: `password123`
-
-| Role | Email |
-|------|-------|
-| Admin | admin@oshus.com |
-| Customer | customer@acme.com |
-| Dispatcher | dispatcher@oshus.com |
-| Warehouse Staff | warehouse@oshus.com |
-| Driver | driver@oshus.com |
-| Finance Officer | finance@oshus.com |
 
 **Demo tracking number:** `OSH-M2K9F8-A3B7`
 

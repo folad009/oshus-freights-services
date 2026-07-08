@@ -3,64 +3,55 @@ import { Logo } from "@/components/logo";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { TERMS_VERSION } from "@/lib/billing";
+import { TERMS_PDF_PATH } from "@/lib/terms";
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-brand-navy px-4 py-4 text-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
           <Logo href="/" imageClassName="max-h-12" />
-          <Link href="/login" className={cn(buttonVariants({ size: "sm" }), "bg-brand-blue text-brand-navy")}>
-            Sign In
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={TERMS_PDF_PATH}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }), "border-white/30 bg-transparent text-white hover:bg-white/10")}
+            >
+              Open PDF
+            </Link>
+            <Link href="/login" className={cn(buttonVariants({ size: "sm" }), "bg-brand-blue text-brand-navy")}>
+              Sign In
+            </Link>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="text-3xl font-bold text-brand-navy">Terms and Conditions</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Version {TERMS_VERSION}</p>
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-brand-navy">Terms and Conditions</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Version {TERMS_VERSION}</p>
+          </div>
+          <Link
+            href={TERMS_PDF_PATH}
+            download
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
+          >
+            Download PDF
+          </Link>
+        </div>
 
-        <div className="prose prose-sm mt-8 max-w-none text-foreground">
-          <p>
-            By creating a shipment with Oshus Freight Services, you agree to the following terms
-            governing carriage, billing, and optional services.
-          </p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Read the document below before accepting terms when booking a shipment.
+        </p>
 
-          <h2 className="text-lg font-semibold text-brand-navy">Shipment services</h2>
-          <p>
-            Quoted freight charges cover standard carriage from origin hub to destination hub unless
-            door pickup or door delivery is explicitly selected. Door pickup and door delivery are
-            optional add-on services billed separately from base freight.
-          </p>
-
-          <h2 className="text-lg font-semibold text-brand-navy">Insurance</h2>
-          <p>
-            Optional cargo insurance is available when declared value is provided at booking. Premium
-            is calculated from declared value and charged in addition to freight and any door service
-            fees. Standard liability limits apply when insurance is not purchased.
-          </p>
-
-          <h2 className="text-lg font-semibold text-brand-navy">Customer responsibilities</h2>
-          <ul className="list-disc pl-5">
-            <li>Provide accurate package dimensions, weight, origin, and destination details.</li>
-            <li>Ensure goods are properly packed and labeled for transport.</li>
-            <li>Pay all invoices, including add-on service fees, by the stated due date.</li>
-            <li>Comply with applicable customs, import, and export regulations.</li>
-          </ul>
-
-          <h2 className="text-lg font-semibold text-brand-navy">Prohibited items</h2>
-          <p>
-            Hazardous materials, illegal goods, perishable items without prior approval, and other
-            restricted commodities may not be shipped. Oshus Freight Services reserves the right to
-            refuse or hold shipments that violate these restrictions.
-          </p>
-
-          <h2 className="text-lg font-semibold text-brand-navy">Claims and liability</h2>
-          <p>
-            Claims for loss or damage must be reported promptly with supporting documentation.
-            Liability is limited to the lesser of repair cost, replacement value, or applicable
-            insurance coverage unless otherwise agreed in writing.
-          </p>
+        <div className="mt-6 overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+          <iframe
+            src={TERMS_PDF_PATH}
+            title="Oshus Freight Terms and Conditions"
+            className="h-[min(75vh,900px)] w-full bg-white"
+          />
         </div>
       </main>
     </div>

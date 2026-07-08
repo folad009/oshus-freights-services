@@ -19,10 +19,6 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isPublicRoute = isPublicPath(nextUrl.pathname);
   const isAuthRoute = authRoutes.includes(nextUrl.pathname);
-  const isApiRoute = nextUrl.pathname.startsWith("/api");
-  const isDashboard = nextUrl.pathname.startsWith("/dashboard");
-
-  if (isApiRoute) return;
 
   const role = req.auth?.user?.role as UserRole | undefined;
   const dashboardPath = role ? ROLE_DASHBOARD_PATH[role] : null;
@@ -31,7 +27,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(dashboardPath, nextUrl));
   }
 
-  if (!isLoggedIn && (isDashboard || (!isPublicRoute && !isAuthRoute))) {
+  if (!isLoggedIn && (!isPublicRoute && !isAuthRoute)) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
@@ -41,5 +37,6 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  // Exclude API routes so Auth.js handlers and other route handlers respond with JSON.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

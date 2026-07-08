@@ -44,6 +44,13 @@ enum ShipmentStatus {
   RETURNED
 }
 
+enum GovernmentIdType {
+  INTERNATIONAL_PASSPORT
+  DRIVERS_LICENSE
+  NATIONAL_ID
+  OTHER_GOVERNMENT_ID
+}
+
 enum InventoryCategory {
   PACKAGING_MATERIALS
   GOODS
@@ -219,6 +226,11 @@ model Shipment {
   insuranceCost   Float?
   termsAcceptedAt DateTime?
   termsVersion    String?
+  idDocumentType  GovernmentIdType?
+  idDocumentStorageKey String?
+  idDocumentOriginalName String?
+  idDocumentMimeType String?
+  idDocumentUploadedAt DateTime?
   notes           String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

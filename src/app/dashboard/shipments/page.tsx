@@ -110,8 +110,8 @@ export default function ShipmentsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Shipments</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Shipments</h1>
+          <p className="text-base text-muted-foreground">
             {isCustomer
               ? "Create shipments and view your booking history"
               : isWarehouseStaff

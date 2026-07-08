@@ -24,6 +24,7 @@ import { formatCurrency } from "@/lib/helpers";
 import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import { calculateVolumetricWeightKg } from "@/lib/shipment-metrics";
 import { submitShipmentIntakeSchema, type SubmitShipmentIntakeInput } from "@/lib/validations";
+import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
 import { ShipmentType } from "@/types/enums";
 import { cn } from "@/lib/utils";
 
@@ -425,21 +426,7 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
             </div>
           )}
 
-          <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={acceptedTerms}
-              onChange={(event) => setAcceptedTerms(event.target.checked)}
-            />
-            <span>
-              I have read and agree to the{" "}
-              <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">
-                Terms and Conditions
-              </Link>
-              .
-            </span>
-          </label>
+          <TermsAcceptanceField checked={acceptedTerms} onChange={setAcceptedTerms} />
         </CardContent>
       </Card>
 

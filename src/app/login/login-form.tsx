@@ -137,9 +137,7 @@ export function LoginForm() {
                 {loading ? "Signing in..." : "Sign in"}
               </Button>
             </form>
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Demo: admin@oshus.com / password123
-            </p>
+
           </CardContent>
         </Card>
       </div>
