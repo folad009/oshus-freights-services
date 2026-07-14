@@ -11,8 +11,7 @@ export type ContainerType = keyof typeof CONTAINER_CAPACITIES;
 
 const CONTAINER_SHIPMENT_TYPES: ShipmentTypeValue[] = [
   ShipmentType.STANDARD_SEA_FREIGHT,
-  ShipmentType.BULK_CARGO,
-  ShipmentType.INTERNATIONAL,
+  ShipmentType.EXPRESS,
 ];
 
 export function usesContainerCapacity(shipmentType: ShipmentTypeValue) {
@@ -20,8 +19,7 @@ export function usesContainerCapacity(shipmentType: ShipmentTypeValue) {
 }
 
 export function defaultContainerType(shipmentType: ShipmentTypeValue): ContainerType {
-  if (shipmentType === ShipmentType.BULK_CARGO) return "CONTAINER_40FT_HC";
-  if (shipmentType === ShipmentType.INTERNATIONAL) return "CONTAINER_20FT";
+  if (shipmentType === ShipmentType.EXPRESS) return "CONTAINER_20FT";
   return "CONTAINER_40FT";
 }
 

@@ -26,10 +26,9 @@ enum UserStatus {
 
 enum ShipmentType {
   DOMESTIC
-  INTERNATIONAL
+  EXPRESS
   STANDARD_AIR_FREIGHT
   STANDARD_SEA_FREIGHT
-  BULK_CARGO
 }
 
 enum ShipmentStatus {
@@ -45,6 +44,7 @@ enum ShipmentStatus {
 }
 
 enum GovernmentIdType {
+  NIN
   INTERNATIONAL_PASSPORT
   DRIVERS_LICENSE
   NATIONAL_ID
@@ -227,6 +227,7 @@ model Shipment {
   termsAcceptedAt DateTime?
   termsVersion    String?
   idDocumentType  GovernmentIdType?
+  idDocumentNumber String?
   idDocumentStorageKey String?
   idDocumentOriginalName String?
   idDocumentMimeType String?

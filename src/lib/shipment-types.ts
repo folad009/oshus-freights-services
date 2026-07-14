@@ -2,19 +2,16 @@ import { ShipmentType, type ShipmentType as ShipmentTypeValue } from "@/types/en
 
 export const SHIPMENT_TYPE_LABELS: Record<ShipmentTypeValue, string> = {
   DOMESTIC: "Domestic",
-  INTERNATIONAL: "International",
+  EXPRESS: "Express",
   STANDARD_AIR_FREIGHT: "Standard Air Freight",
   STANDARD_SEA_FREIGHT: "Standard Sea Freight",
-  BULK_CARGO: "Bulk Cargo",
 };
 
-/** Shipment types available to customers (Express removed). */
 export const CUSTOMER_SHIPMENT_TYPES: ShipmentTypeValue[] = [
   ShipmentType.STANDARD_AIR_FREIGHT,
   ShipmentType.STANDARD_SEA_FREIGHT,
   ShipmentType.DOMESTIC,
-  ShipmentType.INTERNATIONAL,
-  ShipmentType.BULK_CARGO,
+  ShipmentType.EXPRESS,
 ];
 
 export const STAFF_SHIPMENT_TYPES: ShipmentTypeValue[] = Object.values(ShipmentType);

@@ -4,6 +4,7 @@ import {
   ShipmentStatus,
   InventoryCategory,
   VehicleType,
+  VehicleStatus,
   InvoiceStatus,
   PaymentMethod,
   TicketCategory,
@@ -146,6 +147,7 @@ export const createShipmentSchema = shipmentCoreFieldsSchema
     warehouseId: z.string().optional(),
     acceptedTerms: z.boolean().optional(),
     idDocumentType: z.nativeEnum(GovernmentIdType).optional(),
+    idDocumentNumber: z.string().min(1).optional(),
     idDocumentStorageKey: z.string().min(1).optional(),
   })
   .superRefine(shipmentServiceRefinement);
@@ -170,20 +172,40 @@ export const updateShipmentSchema = z.object({
 });
 
 export const createInventorySchema = z.object({
-  warehouseId: z.string(),
+  warehouseId: z.string().min(1, "Warehouse branch is required"),
   binId: z.string().optional(),
-  sku: z.string().min(1),
-  productName: z.string().min(1),
+  sku: z.string().min(1, "SKU is required"),
+  productName: z.string().min(1, "Product name is required"),
   category: z.nativeEnum(InventoryCategory),
   quantity: z.number().int().min(0),
   unitCost: z.number().min(0),
   reorderLevel: z.number().int().min(0).optional(),
 });
 
+export const updateInventorySchema = z.object({
+  productName: z.string().min(1, "Product name is required"),
+  category: z.nativeEnum(InventoryCategory),
+  quantity: z.number().int().min(0),
+  unitCost: z.number().min(0),
+  reorderLevel: z.number().int().min(0),
+  binId: z.string().optional().nullable(),
+  adjustmentNotes: z.string().optional(),
+});
+
 export const createVehicleSchema = z.object({
-  plateNumber: z.string().min(1),
+  plateNumber: z.string().min(1, "Plate number is required"),
   type: z.nativeEnum(VehicleType),
-  capacity: z.number().positive(),
+  capacity: z.number().positive("Capacity must be greater than 0"),
+});
+
+export const updateVehicleSchema = z.object({
+  plateNumber: z.string().min(1, "Plate number is required"),
+  type: z.nativeEnum(VehicleType),
+  capacity: z.number().positive("Capacity must be greater than 0"),
+  status: z.nativeEnum(VehicleStatus),
+  fuelUsage: z.number().min(0).optional(),
+  lastMaintenance: z.string().optional().nullable(),
+  nextMaintenance: z.string().optional().nullable(),
 });
 
 export const createInvoiceSchema = z.object({
@@ -279,6 +301,9 @@ export const submitShipmentIntakeSchema = shipmentIntakeCustomerFields
       acceptedTerms: z.boolean().refine((val) => val === true, {
         message: "You must accept the terms and conditions",
       }),
+      idDocumentType: z.nativeEnum(GovernmentIdType),
+      idDocumentNumber: z.string().min(1, "ID number is required"),
+      idDocumentStorageKey: z.string().min(1, "Government ID document is required"),
     })
   )
   .superRefine(shipmentServiceRefinement);
@@ -296,6 +321,10 @@ export type AssignShipmentInput = z.infer<typeof assignShipmentSchema>;
 export type PayInvoiceInput = z.infer<typeof payInvoiceSchema>;
 export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>;
 export type UpdateWarehouseInput = z.infer<typeof updateWarehouseSchema>;
+export type CreateInventoryInput = z.infer<typeof createInventorySchema>;
+export type UpdateInventoryInput = z.infer<typeof updateInventorySchema>;
+export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
+export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;
 export type AssignWarehouseStaffInput = z.infer<typeof assignWarehouseStaffSchema>;
 export type CreateShipmentIntakeLinkInput = z.infer<typeof createShipmentIntakeLinkSchema>;
 export type SubmitShipmentIntakeInput = z.infer<typeof submitShipmentIntakeSchema>;

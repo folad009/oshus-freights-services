@@ -45,6 +45,7 @@ import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
 import {
   IdDocumentUploadField,
   uploadCustomerIdDocument,
+  validateIdDocumentFields,
 } from "@/components/forms/id-document-upload-field";
 import { cn } from "@/lib/utils";
 
@@ -98,6 +99,7 @@ function ShipmentCreateForm({
   const { data: session } = useSession();
   const isCustomer = session?.user?.role === "CUSTOMER";
   const role = session?.user?.role as UserRole | undefined;
+  const isWarehouseStaff = role === UserRole.WAREHOUSE_STAFF;
   const showWarehouseField = canSelectWarehouse(role);
 
   const { data: customers } = useQuery({
@@ -144,6 +146,7 @@ function ShipmentCreateForm({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [staffMode, setStaffMode] = useState<"create" | "link">("create");
   const [idDocumentType, setIdDocumentType] = useState<GovernmentIdType | "">("");
+  const [idDocumentNumber, setIdDocumentNumber] = useState("");
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [idDocumentError, setIdDocumentError] = useState("");
 
@@ -185,6 +188,7 @@ function ShipmentCreateForm({
       setAcceptedTerms(false);
       setStaffMode("create");
       setIdDocumentType("");
+      setIdDocumentNumber("");
       setIdDocumentFile(null);
       setIdDocumentError("");
       reset({
@@ -211,6 +215,13 @@ function ShipmentCreateForm({
     }
   }, [open, reset]);
 
+  useEffect(() => {
+    if (!open || isCustomer || !isWarehouseStaff || !warehouses?.length) return;
+    if (warehouses.length === 1) {
+      setValue("warehouseId", warehouses[0].id);
+    }
+  }, [open, isCustomer, isWarehouseStaff, warehouses, setValue]);
+
   async function handleCreateClick() {
     if (isCreating) return;
     clearErrors();
@@ -221,17 +232,15 @@ function ShipmentCreateForm({
     }
 
     if (isCustomer) {
-      if (!idDocumentType) {
-        setIdDocumentError("Select the type of ID you are uploading");
-        toast.error("Government ID type is required");
+      try {
+        validateIdDocumentFields(idDocumentType, idDocumentNumber, idDocumentFile);
+        setIdDocumentError("");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Invalid ID document";
+        setIdDocumentError(message);
+        toast.error(message);
         return;
       }
-      if (!idDocumentFile) {
-        setIdDocumentError("Upload a valid government-issued ID document");
-        toast.error("Government ID upload is required");
-        return;
-      }
-      setIdDocumentError("");
     }
 
     const values = getValues();
@@ -275,11 +284,17 @@ function ShipmentCreateForm({
     try {
       let idDocumentStorageKey: string | undefined;
       let uploadedIdDocumentType: GovernmentIdType | undefined;
+      let uploadedIdDocumentNumber: string | undefined;
 
       if (isCustomer && idDocumentFile && idDocumentType) {
-        const uploaded = await uploadCustomerIdDocument(idDocumentFile, idDocumentType);
+        const uploaded = await uploadCustomerIdDocument(
+          idDocumentFile,
+          idDocumentType,
+          idDocumentNumber
+        );
         idDocumentStorageKey = uploaded.storageKey;
         uploadedIdDocumentType = uploaded.idDocumentType;
+        uploadedIdDocumentNumber = uploaded.idDocumentNumber;
       }
 
       const res = await fetch("/api/shipments", {
@@ -289,6 +304,7 @@ function ShipmentCreateForm({
           ...parsed.data,
           idDocumentStorageKey,
           idDocumentType: uploadedIdDocumentType,
+          idDocumentNumber: uploadedIdDocumentNumber,
         }),
       });
       const json = await res.json();
@@ -545,6 +561,8 @@ function ShipmentCreateForm({
         <IdDocumentUploadField
           idDocumentType={idDocumentType}
           onIdDocumentTypeChange={setIdDocumentType}
+          idDocumentNumber={idDocumentNumber}
+          onIdDocumentNumberChange={setIdDocumentNumber}
           selectedFile={idDocumentFile}
           onSelectedFileChange={setIdDocumentFile}
           error={idDocumentError}

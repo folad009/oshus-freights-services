@@ -15,7 +15,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ShipmentBarcode } from "@/components/shipment-barcode";
 import { formatCurrency, formatDate, formatCbm } from "@/lib/helpers";
 import { getShipmentTypeLabel } from "@/lib/shipment-types";
-import { getGovernmentIdTypeLabel } from "@/lib/id-document";
+import { getGovernmentIdTypeLabel, maskIdDocumentNumber } from "@/lib/id-document";
 
 interface ShipmentViewDialogProps {
   open: boolean;
@@ -46,6 +46,7 @@ type ShipmentDetails = {
   estimatedDelivery: string | null;
   notes: string | null;
   idDocumentType: string | null;
+  idDocumentNumber: string | null;
   idDocumentOriginalName: string | null;
   idDocumentUploadedAt: string | null;
   createdAt: string;
@@ -164,6 +165,15 @@ export function ShipmentViewDialog({ open, onOpenChange, shipmentId }: ShipmentV
                   label="Document type"
                   value={getGovernmentIdTypeLabel(shipment.idDocumentType)}
                 />
+                {shipment.idDocumentNumber && (
+                  <DetailRow
+                    label="ID number"
+                    value={maskIdDocumentNumber(
+                      shipment.idDocumentType ?? "",
+                      shipment.idDocumentNumber
+                    )}
+                  />
+                )}
                 {shipment.idDocumentUploadedAt && (
                   <DetailRow label="Uploaded" value={formatDate(shipment.idDocumentUploadedAt)} />
                 )}

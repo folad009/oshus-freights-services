@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, Package } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -25,7 +25,12 @@ import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import { calculateVolumetricWeightKg } from "@/lib/shipment-metrics";
 import { submitShipmentIntakeSchema, type SubmitShipmentIntakeInput } from "@/lib/validations";
 import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
-import { ShipmentType } from "@/types/enums";
+import {
+  IdDocumentUploadField,
+  uploadIntakeIdDocument,
+  validateIdDocumentFields,
+} from "@/components/forms/id-document-upload-field";
+import { GovernmentIdType, ShipmentType } from "@/types/enums";
 import { cn } from "@/lib/utils";
 
 type IntakeLinkInfo = {
@@ -41,10 +46,14 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<{ trackingNumber: string } | null>(null);
+  const [idDocumentType, setIdDocumentType] = useState<GovernmentIdType | "">("");
+  const [idDocumentNumber, setIdDocumentNumber] = useState("");
+  const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
+  const [idDocumentError, setIdDocumentError] = useState("");
 
   const {
     register,
-    watch,
+    control,
     setValue,
     getValues,
     setError,
@@ -71,16 +80,32 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     },
   });
 
-  const shipmentType = watch("shipmentType");
-  const lengthCm = watch("lengthCm");
-  const widthCm = watch("widthCm");
-  const heightCm = watch("heightCm");
-  const packageCount = watch("packageCount");
-  const requestPickup = watch("requestPickup");
-  const requestDelivery = watch("requestDelivery");
-  const hasInsurance = watch("hasInsurance");
-  const declaredValue = watch("declaredValue");
-  const weight = watch("weight");
+  const [
+    shipmentType,
+    lengthCm,
+    widthCm,
+    heightCm,
+    packageCount,
+    requestPickup,
+    requestDelivery,
+    hasInsurance,
+    declaredValue,
+    weight,
+  ] = useWatch({
+    control,
+    name: [
+      "shipmentType",
+      "lengthCm",
+      "widthCm",
+      "heightCm",
+      "packageCount",
+      "requestPickup",
+      "requestDelivery",
+      "hasInsurance",
+      "declaredValue",
+      "weight",
+    ],
+  });
 
   const shipmentTypeOptions = getShipmentTypeOptions(true);
 
@@ -126,6 +151,16 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
       return;
     }
 
+    try {
+      validateIdDocumentFields(idDocumentType, idDocumentNumber, idDocumentFile);
+      setIdDocumentError("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid ID document";
+      setIdDocumentError(message);
+      toast.error(message);
+      return;
+    }
+
     const values = getValues();
     const computedWeight = calculateVolumetricWeightKg({
       lengthCm: Number(values.lengthCm),
@@ -142,6 +177,9 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
       pickupAddress: values.pickupAddress?.trim() || undefined,
       deliveryAddress: values.deliveryAddress?.trim() || undefined,
       acceptedTerms: true,
+      idDocumentType,
+      idDocumentNumber: idDocumentNumber.trim(),
+      idDocumentStorageKey: "pending-upload",
     });
 
     if (!parsed.success) {
@@ -156,10 +194,22 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
 
     setIsSubmitting(true);
     try {
+      const uploaded = await uploadIntakeIdDocument(
+        token,
+        idDocumentFile!,
+        idDocumentType as GovernmentIdType,
+        idDocumentNumber
+      );
+
       const res = await fetch(`/api/shipment-intake-links/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({
+          ...parsed.data,
+          idDocumentType: uploaded.idDocumentType,
+          idDocumentNumber: uploaded.idDocumentNumber,
+          idDocumentStorageKey: uploaded.storageKey,
+        }),
       });
       const json = await res.json();
       if (!json.success) {
@@ -430,6 +480,26 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Identity verification</CardTitle>
+          <CardDescription>
+            Upload a government-issued ID to verify your identity for this shipment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <IdDocumentUploadField
+            idDocumentType={idDocumentType}
+            onIdDocumentTypeChange={setIdDocumentType}
+            idDocumentNumber={idDocumentNumber}
+            onIdDocumentNumberChange={setIdDocumentNumber}
+            selectedFile={idDocumentFile}
+            onSelectedFileChange={setIdDocumentFile}
+            error={idDocumentError}
+          />
+        </CardContent>
+      </Card>
+
       <Button type="submit" size="lg" disabled={isSubmitting || !acceptedTerms} className="w-full sm:w-auto">
         {isSubmitting ? (
           <>
@@ -450,9 +520,9 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
 export function ShipmentIntakePageShell({ token }: { token: string }) {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-background/95 backdrop-blur">
+      <header className="border-b bg-primary backdrop-blur">
         <div className="mx-auto flex h-14 max-w-2xl items-center px-4">
-          <Logo href="/" imageClassName="h-7 w-auto max-h-7" />
+          <Logo href="/" imageClassName="h-14 w-auto max-h-14" />
         </div>
       </header>
       <main className="px-4 py-8">

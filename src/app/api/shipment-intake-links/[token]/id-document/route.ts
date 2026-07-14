@@ -1,15 +1,18 @@
 import { NextRequest } from "next/server";
-import { UserRole } from "@/types/enums";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
-import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { isCustomerGovernmentIdType } from "@/lib/id-document";
-import { savePendingIdDocument } from "@/lib/id-document-storage";
+import { getActiveIntakeLink } from "@/lib/shipment-intake";
+import { saveIntakePendingIdDocument } from "@/lib/id-document-storage";
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
   try {
-    const user = await getAuthContext("shipments:write");
-    if (user.role !== UserRole.CUSTOMER) {
-      return errorResponse("Only customers can upload ID documents here", 403);
+    const { token } = await params;
+    const link = await getActiveIntakeLink(token);
+    if (!link) {
+      return errorResponse("This intake link is invalid or has expired.", 404);
     }
 
     const formData = await req.formData();
@@ -27,8 +30,8 @@ export async function POST(req: NextRequest) {
       return errorResponse("ID number is required");
     }
 
-    const meta = await savePendingIdDocument({
-      userId: user.id,
+    const meta = await saveIntakePendingIdDocument({
+      intakeToken: token,
       file,
       idDocumentType,
       idDocumentNumber,
@@ -45,7 +48,6 @@ export async function POST(req: NextRequest) {
       201
     );
   } catch (error) {
-    if (error instanceof AuthError) return errorResponse(error.message, error.status);
     if (error instanceof Error && error.message) return errorResponse(error.message);
     return handleApiError(error);
   }

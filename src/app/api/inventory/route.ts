@@ -42,8 +42,22 @@ export async function POST(req: NextRequest) {
 
     await assertWarehouseAccess(user, parsed.data.warehouseId);
 
+    const duplicate = await db.inventoryItem.findFirst({
+      where: {
+        warehouseId: parsed.data.warehouseId,
+        sku: parsed.data.sku.trim(),
+      },
+    });
+    if (duplicate) {
+      return errorResponse("SKU already exists for this warehouse branch");
+    }
+
     const item = await db.inventoryItem.create({
-      data: parsed.data,
+      data: {
+        ...parsed.data,
+        sku: parsed.data.sku.trim(),
+        productName: parsed.data.productName.trim(),
+      },
       include: { warehouse: { select: { name: true, code: true } } },
     });
 

@@ -13,6 +13,10 @@ import {
   TERMS_VERSION,
 } from "@/lib/billing";
 import { notifyShipmentCreated } from "@/lib/notifications";
+import {
+  isCustomerGovernmentIdType,
+  validateIdDocumentNumber,
+} from "@/lib/id-document";
 import { attachPendingIdDocument } from "@/lib/id-document-storage";
 import {
   getWarehouseScope,
@@ -86,6 +90,17 @@ export async function POST(req: NextRequest) {
       }
       if (!parsed.data.idDocumentType || !parsed.data.idDocumentStorageKey?.trim()) {
         return errorResponse("A valid government-issued ID document is required");
+      }
+      if (!parsed.data.idDocumentNumber?.trim()) {
+        return errorResponse("ID number is required");
+      }
+      if (!isCustomerGovernmentIdType(parsed.data.idDocumentType)) {
+        return errorResponse("Select a valid ID document type");
+      }
+      try {
+        validateIdDocumentNumber(parsed.data.idDocumentType, parsed.data.idDocumentNumber);
+      } catch (error) {
+        return errorResponse(error instanceof Error ? error.message : "Invalid ID number");
       }
     }
     if (!customerId) return errorResponse("Customer ID is required");
@@ -172,6 +187,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         shipmentId: shipment.id,
         idDocumentType: parsed.data.idDocumentType as GovernmentIdType,
+        idDocumentNumber: parsed.data.idDocumentNumber!.trim(),
       });
 
       await db.shipment.update({

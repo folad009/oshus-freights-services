@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Check, Link2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ export function ShipmentIntakeLinkPanel({
   onClose: () => void;
 }) {
   const showWarehouseField = canSelectWarehouse(role);
+  const isWarehouseStaff = role === UserRole.WAREHOUSE_STAFF;
   const [warehouseId, setWarehouseId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [linkResult, setLinkResult] = useState<IntakeLinkResult | null>(null);
@@ -51,6 +52,13 @@ export function ShipmentIntakeLinkPanel({
     queryFn: fetchWarehouseOptions,
     enabled: showWarehouseField,
   });
+
+  useEffect(() => {
+    if (!isWarehouseStaff || !warehouses?.length) return;
+    if (warehouses.length === 1) {
+      setWarehouseId(warehouses[0].id);
+    }
+  }, [isWarehouseStaff, warehouses]);
 
   async function handleGenerate() {
     setIsGenerating(true);

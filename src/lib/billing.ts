@@ -13,18 +13,16 @@ export const INSURANCE_MIN_FEE = 10;
 
 const RATE_PER_KG: Record<ShipmentTypeValue, number> = {
   DOMESTIC: 2.0,
-  INTERNATIONAL: 5.0,
+  EXPRESS: 5.0,
   STANDARD_AIR_FREIGHT: 1.5,
   STANDARD_SEA_FREIGHT: 0.8,
-  BULK_CARGO: 0.5,
 };
 
 const MIN_CHARGE: Record<ShipmentTypeValue, number> = {
   DOMESTIC: 25,
-  INTERNATIONAL: 75,
+  EXPRESS: 75,
   STANDARD_AIR_FREIGHT: 20,
   STANDARD_SEA_FREIGHT: 100,
-  BULK_CARGO: 200,
 };
 
 const TAX_RATE = 0.1;

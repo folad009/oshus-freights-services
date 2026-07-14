@@ -27,10 +27,9 @@ export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus];
 
 export const ShipmentType = {
   DOMESTIC: "DOMESTIC",
-  INTERNATIONAL: "INTERNATIONAL",
+  EXPRESS: "EXPRESS",
   STANDARD_AIR_FREIGHT: "STANDARD_AIR_FREIGHT",
   STANDARD_SEA_FREIGHT: "STANDARD_SEA_FREIGHT",
-  BULK_CARGO: "BULK_CARGO",
 } as const;
 
 export type ShipmentType = (typeof ShipmentType)[keyof typeof ShipmentType];
@@ -50,6 +49,7 @@ export const ShipmentStatus = {
 export type ShipmentStatus = (typeof ShipmentStatus)[keyof typeof ShipmentStatus];
 
 export const GovernmentIdType = {
+  NIN: "NIN",
   INTERNATIONAL_PASSPORT: "INTERNATIONAL_PASSPORT",
   DRIVERS_LICENSE: "DRIVERS_LICENSE",
   NATIONAL_ID: "NATIONAL_ID",

@@ -15,7 +15,13 @@ import {
   TERMS_VERSION,
 } from "./billing";
 import { notifyCustomerCreated, notifyShipmentCreated } from "./notifications";
+import {
+  isCustomerGovernmentIdType,
+  validateIdDocumentNumber,
+} from "./id-document";
+import { attachIntakePendingIdDocument } from "./id-document-storage";
 import type { SubmitShipmentIntakeInput } from "./validations";
+import { GovernmentIdType } from "@/types/enums";
 
 export const INTAKE_LINK_TTL_DAYS = 14;
 
@@ -61,6 +67,11 @@ export async function submitShipmentIntake(token: string, data: SubmitShipmentIn
   if (link.expiresAt.getTime() <= Date.now()) {
     throw new Error("This intake link has expired.");
   }
+
+  if (!isCustomerGovernmentIdType(data.idDocumentType)) {
+    throw new Error("Select a valid ID document type");
+  }
+  validateIdDocumentNumber(data.idDocumentType, data.idDocumentNumber);
 
   const existingUser = await db.user.findUnique({
     where: { email: data.email },
@@ -160,6 +171,19 @@ export async function submitShipmentIntake(token: string, data: SubmitShipmentIn
     });
 
     return { customer, shipment, userId: user.id };
+  });
+
+  const idDocument = await attachIntakePendingIdDocument({
+    storageKey: data.idDocumentStorageKey.trim(),
+    intakeToken: token,
+    shipmentId: result.shipment.id,
+    idDocumentType: data.idDocumentType as GovernmentIdType,
+    idDocumentNumber: data.idDocumentNumber.trim(),
+  });
+
+  await db.shipment.update({
+    where: { id: result.shipment.id },
+    data: idDocument,
   });
 
   await createAuditLog({
