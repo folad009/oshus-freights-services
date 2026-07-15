@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ShipmentFormDialog } from "@/components/forms/shipment-form-dialog";
 import { SupportTicketFormDialog } from "@/components/forms/support-ticket-form-dialog";
+import { CustomerFormDialog } from "@/components/forms/customer-form-dialog";
 import { formatDate } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ async function fetchStats(): Promise<DashboardStats> {
 }
 
 const quickLinks = [
-  { title: "Customers", href: "/dashboard/customers", description: "View customer accounts" },
+  { title: "Customers", href: "/dashboard/customers", description: "Manage customer accounts" },
   { title: "Shipments", href: "/dashboard/shipments", description: "Track shipment activity" },
   { title: "Support", href: "/dashboard/support", description: "Monitor customer inquiries" },
 ];
@@ -55,6 +56,7 @@ export function MarketingDashboard() {
   const queryClient = useQueryClient();
   const [shipmentFormOpen, setShipmentFormOpen] = useState(false);
   const [supportFormOpen, setSupportFormOpen] = useState(false);
+  const [customerFormOpen, setCustomerFormOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard-stats"],
@@ -73,6 +75,14 @@ export function MarketingDashboard() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
       queryClient.invalidateQueries({ queryKey: ["support"] }),
+    ]);
+  }
+
+  async function handleCustomerSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["customers"] }),
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
     ]);
   }
 
@@ -103,7 +113,11 @@ export function MarketingDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setShipmentFormOpen(true)}>
+          <Button onClick={() => setCustomerFormOpen(true)}>
+            <Plus />
+            New Customer
+          </Button>
+          <Button variant="outline" onClick={() => setShipmentFormOpen(true)}>
             <Plus />
             New Shipment
           </Button>
@@ -205,6 +219,12 @@ export function MarketingDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <CustomerFormDialog
+        open={customerFormOpen}
+        onOpenChange={setCustomerFormOpen}
+        onSuccess={handleCustomerSuccess}
+      />
 
       <ShipmentFormDialog
         open={shipmentFormOpen}

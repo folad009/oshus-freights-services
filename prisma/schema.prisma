@@ -169,6 +169,12 @@ model Customer {
   contactPerson String
   phone         String
   address       String
+  idDocumentType  GovernmentIdType?
+  idDocumentNumber String?
+  idDocumentStorageKey String?
+  idDocumentOriginalName String?
+  idDocumentMimeType String?
+  idDocumentUploadedAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

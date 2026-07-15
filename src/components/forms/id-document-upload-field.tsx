@@ -192,6 +192,33 @@ export function IdDocumentUploadField({
   );
 }
 
+export async function uploadStaffCustomerIdDocument(
+  file: File,
+  idDocumentType: GovernmentIdType,
+  idDocumentNumber: string
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("idDocumentType", idDocumentType);
+  formData.append("idDocumentNumber", idDocumentNumber);
+
+  const res = await fetch("/api/customers/id-document", {
+    method: "POST",
+    body: formData,
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.message ?? "Failed to upload ID document");
+  }
+  return json.data as {
+    storageKey: string;
+    idDocumentType: GovernmentIdType;
+    idDocumentNumber: string;
+    originalName: string;
+    mimeType: string;
+  };
+}
+
 export async function uploadCustomerIdDocument(
   file: File,
   idDocumentType: GovernmentIdType,

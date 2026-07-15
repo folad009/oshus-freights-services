@@ -68,13 +68,19 @@ export const updateUserSchema = z
     }
   });
 
-export const createCustomerSchema = z.object({
-  companyName: z.string().min(1),
-  contactPerson: z.string().min(1),
-  phone: z.string().min(1),
-  address: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
+export const customerProfileSchema = z.object({
+  companyName: z.string().min(1, "Company name is required"),
+  contactPerson: z.string().min(1, "Contact person is required"),
+  phone: z.string().min(1, "Phone is required"),
+  address: z.string().min(1, "Address is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const createCustomerSchema = customerProfileSchema.extend({
+  idDocumentType: z.nativeEnum(GovernmentIdType),
+  idDocumentNumber: z.string().min(1, "ID number is required"),
+  idDocumentStorageKey: z.string().min(1, "Government ID document is required"),
 });
 
 export const updateCustomerSchema = z.object({
@@ -318,6 +324,7 @@ export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateShipmentInput = z.infer<typeof createShipmentSchema>;
 export type UpdateShipmentInput = z.infer<typeof updateShipmentSchema>;
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
+export type CustomerProfileInput = z.infer<typeof customerProfileSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;

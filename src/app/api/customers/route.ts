@@ -4,9 +4,14 @@ import { successResponse, errorResponse, handleApiError } from "@/lib/api-respon
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { createCustomerSchema } from "@/lib/validations";
 import bcrypt from "bcryptjs";
-import { UserRole, UserStatus } from "@/types/enums";
+import { UserRole, UserStatus, GovernmentIdType } from "@/types/enums";
 import { createAuditLog } from "@/lib/helpers";
 import { notifyCustomerCreated } from "@/lib/notifications";
+import {
+  isCustomerGovernmentIdType,
+  validateIdDocumentNumber,
+} from "@/lib/id-document";
+import { attachPendingIdDocumentToCustomer } from "@/lib/id-document-storage";
 
 export async function GET() {
   try {
@@ -34,6 +39,15 @@ export async function POST(req: NextRequest) {
     const parsed = createCustomerSchema.safeParse(body);
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message);
 
+    if (!isCustomerGovernmentIdType(parsed.data.idDocumentType)) {
+      return errorResponse("Select a valid ID document type");
+    }
+    try {
+      validateIdDocumentNumber(parsed.data.idDocumentType, parsed.data.idDocumentNumber);
+    } catch (error) {
+      return errorResponse(error instanceof Error ? error.message : "Invalid ID number");
+    }
+
     const existing = await db.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return errorResponse("Email already registered");
 
@@ -59,6 +73,20 @@ export async function POST(req: NextRequest) {
       include: { user: { select: { email: true } } },
     });
 
+    const idDocument = await attachPendingIdDocumentToCustomer({
+      storageKey: parsed.data.idDocumentStorageKey.trim(),
+      userId: user.id,
+      customerId: customer.id,
+      idDocumentType: parsed.data.idDocumentType as GovernmentIdType,
+      idDocumentNumber: parsed.data.idDocumentNumber.trim(),
+    });
+
+    const updatedCustomer = await db.customer.update({
+      where: { id: customer.id },
+      data: idDocument,
+      include: { user: { select: { email: true } } },
+    });
+
     await createAuditLog({
       userId: user.id,
       action: "CREATE",
@@ -69,9 +97,10 @@ export async function POST(req: NextRequest) {
 
     await notifyCustomerCreated({ companyName: customer.companyName, userId: customer.userId });
 
-    return successResponse(customer, 201);
+    return successResponse(updatedCustomer, 201);
   } catch (error) {
     if (error instanceof AuthError) return errorResponse(error.message, error.status);
+    if (error instanceof Error && error.message) return errorResponse(error.message);
     return handleApiError(error);
   }
 }

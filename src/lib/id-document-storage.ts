@@ -211,6 +211,59 @@ export async function attachIntakePendingIdDocument(params: {
   };
 }
 
+export async function attachPendingIdDocumentToCustomer(params: {
+  storageKey: string;
+  userId: string;
+  customerId: string;
+  idDocumentType: GovernmentIdType;
+  idDocumentNumber: string;
+}) {
+  if (!params.storageKey.startsWith(`${params.userId}/`)) {
+    throw new Error("Invalid ID document upload.");
+  }
+
+  const normalizedNumber = validateIdDocumentNumber(params.idDocumentType, params.idDocumentNumber);
+  const metaPath = pendingMetaPath(params.storageKey);
+  const pendingPath = pendingFilePath(params.storageKey);
+
+  let metaRaw: string;
+  try {
+    metaRaw = await readFile(metaPath, "utf8");
+  } catch {
+    throw new Error("ID document upload expired or not found. Please upload again.");
+  }
+
+  const meta = JSON.parse(metaRaw) as PendingDocumentMeta;
+  if (
+    meta.userId !== params.userId ||
+    meta.idDocumentType !== params.idDocumentType ||
+    meta.idDocumentNumber !== normalizedNumber
+  ) {
+    throw new Error("ID document details do not match the uploaded file.");
+  }
+
+  const ext = path.extname(pendingPath);
+  const finalStorageKey = `customers/${params.customerId}/id-document${ext}`;
+  const finalPath = shipmentDocumentPath(finalStorageKey);
+
+  await mkdir(path.dirname(finalPath), { recursive: true });
+  await rename(pendingPath, finalPath);
+  await unlink(metaPath).catch(() => undefined);
+
+  return {
+    idDocumentType: params.idDocumentType,
+    idDocumentNumber: meta.idDocumentNumber,
+    idDocumentStorageKey: finalStorageKey,
+    idDocumentOriginalName: meta.originalName,
+    idDocumentMimeType: meta.mimeType,
+    idDocumentUploadedAt: new Date(),
+  };
+}
+
+export async function readCustomerIdDocument(storageKey: string) {
+  return readShipmentIdDocument(storageKey);
+}
+
 export async function readShipmentIdDocument(storageKey: string) {
   const filePath = shipmentDocumentPath(storageKey);
   const buffer = await readFile(filePath);
