@@ -19,7 +19,7 @@ function signInErrorMessage(error: string | null) {
     case "Configuration":
       return "Authentication is not configured on the server. Please contact support.";
     case "CredentialsSignin":
-      return "Invalid email or password. If this is a new deployment, the database may need to be seeded.";
+      return "Invalid email or password. Check that your email is spelled correctly, then try again. New deployments may also need npm run db:seed.";
     default:
       return error ? "Unable to sign in. Please try again." : null;
   }
