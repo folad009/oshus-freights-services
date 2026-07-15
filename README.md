@@ -56,10 +56,6 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-
-
-**Demo tracking number:** `OSH-M2K9F8-A3B7`
-
 ## Project Structure
 
 ```
@@ -93,17 +89,6 @@ Response format:
 { "success": true, "data": {} }
 { "success": false, "message": "Error message" }
 ```
-
-## User Roles & Permissions
-
-| Role | Capabilities |
-|------|-------------|
-| **Admin** | Full system access, user management, audit logs |
-| **Customer** | Create/track shipments, view invoices, support tickets |
-| **Warehouse Staff** | Inventory management, warehouse operations |
-| **Driver** | View assigned deliveries, update shipment status |
-| **Dispatcher** | Assign drivers, schedule pickups, monitor fleet |
-| **Finance Officer** | Generate invoices, track payments, financial reports |
 
 ## Scripts
 
