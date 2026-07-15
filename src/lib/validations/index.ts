@@ -245,8 +245,12 @@ export const createPaymentSchema = z.object({
 
 export const createTicketSchema = z.object({
   category: z.nativeEnum(TicketCategory),
-  subject: z.string().min(1),
-  description: z.string().min(1),
+  subject: z.string().min(1, "Subject is required"),
+  description: z.string().min(1, "Description is required"),
+});
+
+export const staffCreateTicketSchema = createTicketSchema.extend({
+  customerId: z.string().min(1, "Customer is required"),
 });
 
 export const createWarehouseSchema = z.object({
@@ -328,3 +332,5 @@ export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;
 export type AssignWarehouseStaffInput = z.infer<typeof assignWarehouseStaffSchema>;
 export type CreateShipmentIntakeLinkInput = z.infer<typeof createShipmentIntakeLinkSchema>;
 export type SubmitShipmentIntakeInput = z.infer<typeof submitShipmentIntakeSchema>;
+export type CreateTicketInput = z.infer<typeof createTicketSchema>;
+export type StaffCreateTicketInput = z.infer<typeof staffCreateTicketSchema>;

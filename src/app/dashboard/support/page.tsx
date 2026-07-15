@@ -1,13 +1,27 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { SupportTicketFormDialog } from "@/components/forms/support-ticket-form-dialog";
 import { formatDate } from "@/lib/helpers";
+import { hasPermission } from "@/lib/rbac";
+import { UserRole } from "@/types/enums";
 
 export default function SupportPage() {
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  const [formOpen, setFormOpen] = useState(false);
+
+  const role = session?.user?.role as UserRole | undefined;
+  const canWrite = role ? hasPermission(role, "support:write") : false;
+
   const { data, isLoading } = useQuery({
     queryKey: ["support"],
     queryFn: async () => {
@@ -17,12 +31,28 @@ export default function SupportPage() {
     },
   });
 
+  async function handleSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["support"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+    ]);
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Support Tickets</h1>
-        <p className="text-muted-foreground">Manage customer support requests</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Support Tickets</h1>
+          <p className="text-muted-foreground">Manage customer support requests</p>
+        </div>
+        {canWrite && (
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus />
+            New Ticket
+          </Button>
+        )}
       </div>
+
       <Card>
         <CardHeader><CardTitle>All Tickets</CardTitle></CardHeader>
         <CardContent>
@@ -56,6 +86,12 @@ export default function SupportPage() {
           )}
         </CardContent>
       </Card>
+
+      <SupportTicketFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }

@@ -96,9 +96,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   MARKETING: [
     "shipments:read",
+    "shipments:write",
     "customers:read",
-    "reports:read",
     "support:read",
+    "support:write",
   ],
   FRONT_DESK: [
     "shipments:read", "shipments:write",

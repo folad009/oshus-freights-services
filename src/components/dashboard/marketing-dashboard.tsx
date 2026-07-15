@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Package,
   TrendingUp,
@@ -9,12 +10,15 @@ import {
   HeadphonesIcon,
   BarChart3,
   ArrowRight,
+  Plus,
 } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { ShipmentFormDialog } from "@/components/forms/shipment-form-dialog";
+import { SupportTicketFormDialog } from "@/components/forms/support-ticket-form-dialog";
 import { formatDate } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
 
@@ -43,16 +47,34 @@ async function fetchStats(): Promise<DashboardStats> {
 
 const quickLinks = [
   { title: "Customers", href: "/dashboard/customers", description: "View customer accounts" },
-  { title: "Reports", href: "/dashboard/reports", description: "Review performance metrics" },
   { title: "Shipments", href: "/dashboard/shipments", description: "Track shipment activity" },
   { title: "Support", href: "/dashboard/support", description: "Monitor customer inquiries" },
 ];
 
 export function MarketingDashboard() {
+  const queryClient = useQueryClient();
+  const [shipmentFormOpen, setShipmentFormOpen] = useState(false);
+  const [supportFormOpen, setSupportFormOpen] = useState(false);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: fetchStats,
   });
+
+  async function handleShipmentSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["shipments"] }),
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    ]);
+  }
+
+  async function handleSupportSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["support"] }),
+    ]);
+  }
 
   if (isLoading) {
     return (
@@ -73,11 +95,23 @@ export function MarketingDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Marketing Dashboard</h1>
-        <p className="text-muted-foreground">
-          Customer insights, shipment trends, and engagement overview
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Marketing Dashboard</h1>
+          <p className="text-muted-foreground">
+            Customer insights, shipment trends, and engagement overview
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setShipmentFormOpen(true)}>
+            <Plus />
+            New Shipment
+          </Button>
+          <Button variant="outline" onClick={() => setSupportFormOpen(true)}>
+            <Plus />
+            New Support Ticket
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -171,6 +205,18 @@ export function MarketingDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ShipmentFormDialog
+        open={shipmentFormOpen}
+        onOpenChange={setShipmentFormOpen}
+        onSuccess={handleShipmentSuccess}
+      />
+
+      <SupportTicketFormDialog
+        open={supportFormOpen}
+        onOpenChange={setSupportFormOpen}
+        onSuccess={handleSupportSuccess}
+      />
     </div>
   );
 }
