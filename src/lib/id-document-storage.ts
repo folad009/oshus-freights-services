@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { GovernmentIdType } from "@/types/enums";
 import {
@@ -7,9 +6,7 @@ import {
   validateGovernmentIdUpload,
   validateIdDocumentNumber,
 } from "@/lib/id-document";
-
-const UPLOAD_ROOT = path.join(process.cwd(), "uploads", "id-documents");
-const PENDING_ROOT = path.join(UPLOAD_ROOT, "pending");
+import { db } from "@/lib/db";
 
 type PendingDocumentMeta = {
   storageKey: string;
@@ -29,22 +26,52 @@ type IntakePendingDocumentMeta = {
   mimeType: string;
 };
 
-function pendingFilePath(storageKey: string) {
-  return path.join(PENDING_ROOT, storageKey);
-}
-
-function pendingMetaPath(storageKey: string) {
-  return `${pendingFilePath(storageKey)}.json`;
-}
-
-function shipmentDocumentPath(storageKey: string) {
-  return path.join(UPLOAD_ROOT, storageKey);
-}
-
 function extensionForMime(mimeType: string) {
   const ext = ID_DOCUMENT_MIME_EXTENSION[mimeType];
   if (!ext) throw new Error("Unsupported file type. Upload JPG, PNG, WEBP, or PDF.");
   return ext;
+}
+
+async function readStoredBlob(storageKey: string) {
+  const record = await db.idDocumentBlob.findUnique({
+    where: { storageKey },
+  });
+  if (!record) {
+    throw new Error("ID document upload expired or not found. Please upload again.");
+  }
+  return record;
+}
+
+async function writeStoredBlob(params: {
+  storageKey: string;
+  content: Buffer;
+  mimeType: string;
+  metaJson: string;
+}) {
+  await db.idDocumentBlob.create({
+    data: {
+      storageKey: params.storageKey,
+      content: params.content,
+      mimeType: params.mimeType,
+      metaJson: params.metaJson,
+    },
+  });
+}
+
+async function moveStoredBlob(params: {
+  sourceStorageKey: string;
+  destinationStorageKey: string;
+}) {
+  const source = await readStoredBlob(params.sourceStorageKey);
+  await db.idDocumentBlob.create({
+    data: {
+      storageKey: params.destinationStorageKey,
+      content: source.content,
+      mimeType: source.mimeType,
+      metaJson: source.metaJson,
+    },
+  });
+  await db.idDocumentBlob.delete({ where: { storageKey: params.sourceStorageKey } });
 }
 
 export async function savePendingIdDocument(params: {
@@ -61,11 +88,6 @@ export async function savePendingIdDocument(params: {
 
   const ext = extensionForMime(params.file.type);
   const storageKey = `${params.userId}/${randomUUID()}.${ext}`;
-  const filePath = pendingFilePath(storageKey);
-  const metaPath = pendingMetaPath(storageKey);
-
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, Buffer.from(await params.file.arrayBuffer()));
 
   const meta: PendingDocumentMeta = {
     storageKey,
@@ -76,7 +98,13 @@ export async function savePendingIdDocument(params: {
     mimeType: params.file.type,
   };
 
-  await writeFile(metaPath, JSON.stringify(meta), "utf8");
+  await writeStoredBlob({
+    storageKey,
+    content: Buffer.from(await params.file.arrayBuffer()),
+    mimeType: params.file.type,
+    metaJson: JSON.stringify(meta),
+  });
+
   return meta;
 }
 
@@ -94,11 +122,6 @@ export async function saveIntakePendingIdDocument(params: {
 
   const ext = extensionForMime(params.file.type);
   const storageKey = `intake/${params.intakeToken}/${randomUUID()}.${ext}`;
-  const filePath = pendingFilePath(storageKey);
-  const metaPath = pendingMetaPath(storageKey);
-
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, Buffer.from(await params.file.arrayBuffer()));
 
   const meta: IntakePendingDocumentMeta = {
     storageKey,
@@ -109,7 +132,13 @@ export async function saveIntakePendingIdDocument(params: {
     mimeType: params.file.type,
   };
 
-  await writeFile(metaPath, JSON.stringify(meta), "utf8");
+  await writeStoredBlob({
+    storageKey,
+    content: Buffer.from(await params.file.arrayBuffer()),
+    mimeType: params.file.type,
+    metaJson: JSON.stringify(meta),
+  });
+
   return meta;
 }
 
@@ -125,17 +154,9 @@ export async function attachPendingIdDocument(params: {
   }
 
   const normalizedNumber = validateIdDocumentNumber(params.idDocumentType, params.idDocumentNumber);
-  const metaPath = pendingMetaPath(params.storageKey);
-  const pendingPath = pendingFilePath(params.storageKey);
+  const record = await readStoredBlob(params.storageKey);
+  const meta = JSON.parse(record.metaJson) as PendingDocumentMeta;
 
-  let metaRaw: string;
-  try {
-    metaRaw = await readFile(metaPath, "utf8");
-  } catch {
-    throw new Error("ID document upload expired or not found. Please upload again.");
-  }
-
-  const meta = JSON.parse(metaRaw) as PendingDocumentMeta;
   if (
     meta.userId !== params.userId ||
     meta.idDocumentType !== params.idDocumentType ||
@@ -144,13 +165,12 @@ export async function attachPendingIdDocument(params: {
     throw new Error("ID document details do not match the uploaded file.");
   }
 
-  const ext = path.extname(pendingPath);
+  const ext = path.extname(params.storageKey);
   const finalStorageKey = `${params.shipmentId}/id-document${ext}`;
-  const finalPath = shipmentDocumentPath(finalStorageKey);
-
-  await mkdir(path.dirname(finalPath), { recursive: true });
-  await rename(pendingPath, finalPath);
-  await unlink(metaPath).catch(() => undefined);
+  await moveStoredBlob({
+    sourceStorageKey: params.storageKey,
+    destinationStorageKey: finalStorageKey,
+  });
 
   return {
     idDocumentType: params.idDocumentType,
@@ -174,17 +194,9 @@ export async function attachIntakePendingIdDocument(params: {
   }
 
   const normalizedNumber = validateIdDocumentNumber(params.idDocumentType, params.idDocumentNumber);
-  const metaPath = pendingMetaPath(params.storageKey);
-  const pendingPath = pendingFilePath(params.storageKey);
+  const record = await readStoredBlob(params.storageKey);
+  const meta = JSON.parse(record.metaJson) as IntakePendingDocumentMeta;
 
-  let metaRaw: string;
-  try {
-    metaRaw = await readFile(metaPath, "utf8");
-  } catch {
-    throw new Error("ID document upload expired or not found. Please upload again.");
-  }
-
-  const meta = JSON.parse(metaRaw) as IntakePendingDocumentMeta;
   if (
     meta.intakeToken !== params.intakeToken ||
     meta.idDocumentType !== params.idDocumentType ||
@@ -193,13 +205,12 @@ export async function attachIntakePendingIdDocument(params: {
     throw new Error("ID document details do not match the uploaded file.");
   }
 
-  const ext = path.extname(pendingPath);
+  const ext = path.extname(params.storageKey);
   const finalStorageKey = `${params.shipmentId}/id-document${ext}`;
-  const finalPath = shipmentDocumentPath(finalStorageKey);
-
-  await mkdir(path.dirname(finalPath), { recursive: true });
-  await rename(pendingPath, finalPath);
-  await unlink(metaPath).catch(() => undefined);
+  await moveStoredBlob({
+    sourceStorageKey: params.storageKey,
+    destinationStorageKey: finalStorageKey,
+  });
 
   return {
     idDocumentType: params.idDocumentType,
@@ -223,17 +234,9 @@ export async function attachPendingIdDocumentToCustomer(params: {
   }
 
   const normalizedNumber = validateIdDocumentNumber(params.idDocumentType, params.idDocumentNumber);
-  const metaPath = pendingMetaPath(params.storageKey);
-  const pendingPath = pendingFilePath(params.storageKey);
+  const record = await readStoredBlob(params.storageKey);
+  const meta = JSON.parse(record.metaJson) as PendingDocumentMeta;
 
-  let metaRaw: string;
-  try {
-    metaRaw = await readFile(metaPath, "utf8");
-  } catch {
-    throw new Error("ID document upload expired or not found. Please upload again.");
-  }
-
-  const meta = JSON.parse(metaRaw) as PendingDocumentMeta;
   if (
     meta.userId !== params.userId ||
     meta.idDocumentType !== params.idDocumentType ||
@@ -242,13 +245,12 @@ export async function attachPendingIdDocumentToCustomer(params: {
     throw new Error("ID document details do not match the uploaded file.");
   }
 
-  const ext = path.extname(pendingPath);
+  const ext = path.extname(params.storageKey);
   const finalStorageKey = `customers/${params.customerId}/id-document${ext}`;
-  const finalPath = shipmentDocumentPath(finalStorageKey);
-
-  await mkdir(path.dirname(finalPath), { recursive: true });
-  await rename(pendingPath, finalPath);
-  await unlink(metaPath).catch(() => undefined);
+  await moveStoredBlob({
+    sourceStorageKey: params.storageKey,
+    destinationStorageKey: finalStorageKey,
+  });
 
   return {
     idDocumentType: params.idDocumentType,
@@ -265,11 +267,6 @@ export async function readCustomerIdDocument(storageKey: string) {
 }
 
 export async function readShipmentIdDocument(storageKey: string) {
-  const filePath = shipmentDocumentPath(storageKey);
-  const buffer = await readFile(filePath);
-  return buffer;
-}
-
-export function getIdDocumentAbsolutePath(storageKey: string) {
-  return shipmentDocumentPath(storageKey);
+  const record = await readStoredBlob(storageKey);
+  return Buffer.from(record.content);
 }
