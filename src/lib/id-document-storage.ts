@@ -51,7 +51,7 @@ async function writeStoredBlob(params: {
   await db.idDocumentBlob.create({
     data: {
       storageKey: params.storageKey,
-      content: params.content,
+      content: new Uint8Array(params.content),
       mimeType: params.mimeType,
       metaJson: params.metaJson,
     },
@@ -218,6 +218,45 @@ export async function attachIntakePendingIdDocument(params: {
     idDocumentStorageKey: finalStorageKey,
     idDocumentOriginalName: meta.originalName,
     idDocumentMimeType: meta.mimeType,
+    idDocumentUploadedAt: new Date(),
+  };
+}
+
+export async function saveCustomerIdDocumentDirect(params: {
+  customerId: string;
+  file: File;
+  idDocumentType: GovernmentIdType;
+  idDocumentNumber: string;
+}) {
+  const normalizedNumber = validateGovernmentIdUpload({
+    type: params.idDocumentType,
+    file: params.file,
+    idNumber: params.idDocumentNumber,
+  });
+
+  const ext = extensionForMime(params.file.type);
+  const storageKey = `customers/${params.customerId}/id-document.${ext}`;
+
+  await writeStoredBlob({
+    storageKey,
+    content: Buffer.from(await params.file.arrayBuffer()),
+    mimeType: params.file.type,
+    metaJson: JSON.stringify({
+      storageKey,
+      customerId: params.customerId,
+      idDocumentType: params.idDocumentType,
+      idDocumentNumber: normalizedNumber,
+      originalName: params.file.name,
+      mimeType: params.file.type,
+    }),
+  });
+
+  return {
+    idDocumentType: params.idDocumentType,
+    idDocumentNumber: normalizedNumber,
+    idDocumentStorageKey: storageKey,
+    idDocumentOriginalName: params.file.name,
+    idDocumentMimeType: params.file.type,
     idDocumentUploadedAt: new Date(),
   };
 }

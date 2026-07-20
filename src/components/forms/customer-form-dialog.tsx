@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   IdDocumentUploadField,
-  uploadStaffCustomerIdDocument,
   validateIdDocumentFields,
 } from "@/components/forms/id-document-upload-field";
 import {
@@ -94,21 +93,20 @@ function CustomerCreateForm({
     }
 
     try {
-      const uploaded = await uploadStaffCustomerIdDocument(
-        idDocumentFile!,
-        idDocumentType as GovernmentIdType,
-        idDocumentNumber
-      );
+      const formData = new FormData();
+      formData.append("companyName", data.companyName);
+      formData.append("contactPerson", data.contactPerson);
+      formData.append("phone", data.phone);
+      formData.append("address", data.address);
+      formData.append("email", data.email);
+      formData.append("password", data.password);
+      formData.append("idDocumentType", idDocumentType);
+      formData.append("idDocumentNumber", idDocumentNumber);
+      formData.append("idDocumentFile", idDocumentFile!);
 
       const res = await fetch("/api/customers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          idDocumentType: uploaded.idDocumentType,
-          idDocumentNumber: uploaded.idDocumentNumber,
-          idDocumentStorageKey: uploaded.storageKey,
-        }),
+        body: formData,
       });
       const json = await res.json();
       if (!json.success) {
