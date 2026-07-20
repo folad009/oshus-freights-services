@@ -4,6 +4,7 @@ import { successResponse, errorResponse, handleApiError } from "@/lib/api-respon
 import { getAuthContext, AuthError } from "@/lib/api-auth";
 import { updateCustomerSchema } from "@/lib/validations";
 import { createAuditLog } from "@/lib/helpers";
+import { deleteStoredBlobIfExists } from "@/lib/id-document-storage";
 
 export async function GET(
   _req: NextRequest,
@@ -92,10 +93,40 @@ export async function DELETE(
     const user = await getAuthContext("customers:write");
     const { id } = await params;
 
-    const existing = await db.customer.findUnique({ where: { id } });
+    const existing = await db.customer.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { shipments: true, invoices: true } },
+      },
+    });
     if (!existing) return errorResponse("Customer not found", 404);
 
-    await db.customer.delete({ where: { id } });
+    if (existing._count.shipments > 0) {
+      return errorResponse(
+        "Cannot delete a customer with existing shipments. Remove or reassign shipments first.",
+        400
+      );
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.supportTicket.deleteMany({ where: { customerId: id } });
+
+      const invoices = await tx.invoice.findMany({
+        where: { customerId: id },
+        select: { id: true },
+      });
+      if (invoices.length > 0) {
+        await tx.payment.deleteMany({
+          where: { invoiceId: { in: invoices.map((invoice) => invoice.id) } },
+        });
+        await tx.invoice.deleteMany({ where: { customerId: id } });
+      }
+
+      await deleteStoredBlobIfExists(existing.idDocumentStorageKey);
+
+      await tx.customer.delete({ where: { id } });
+      await tx.user.delete({ where: { id: existing.userId } });
+    });
 
     await createAuditLog({
       userId: user.id,

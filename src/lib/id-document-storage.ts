@@ -42,6 +42,11 @@ async function readStoredBlob(storageKey: string) {
   return record;
 }
 
+export async function deleteStoredBlobIfExists(storageKey: string | null | undefined) {
+  if (!storageKey) return;
+  await db.idDocumentBlob.delete({ where: { storageKey } }).catch(() => undefined);
+}
+
 async function writeStoredBlob(params: {
   storageKey: string;
   content: Buffer;

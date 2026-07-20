@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Plus, Pencil } from "lucide-react";
+import { toast } from "sonner";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +27,7 @@ export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const role = session?.user?.role as UserRole | undefined;
   const canWrite = role ? hasPermission(role, "customers:write") : false;
@@ -43,6 +45,34 @@ export default function CustomersPage() {
   function handleSuccess() {
     queryClient.invalidateQueries({ queryKey: ["customers"] });
     queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  }
+
+  async function handleDelete(customer: CustomerRow) {
+    if ((customer._count?.shipments ?? 0) > 0) {
+      toast.error("Cannot delete a customer with existing shipments");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${customer.companyName}? This will permanently remove their account and cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(customer.id);
+    try {
+      const res = await fetch(`/api/customers/${customer.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to delete customer");
+        return;
+      }
+      toast.success("Customer deleted");
+      handleSuccess();
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -81,7 +111,7 @@ export default function CustomersPage() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Shipments</TableHead>
-                  {canWrite && <TableHead className="w-16" />}
+                  {canWrite && <TableHead className="w-24" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,16 +131,33 @@ export default function CustomersPage() {
                       <TableCell>{customer._count?.shipments ?? 0}</TableCell>
                       {canWrite && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => {
-                              setEditId(customer.id);
-                              setFormOpen(true);
-                            }}
-                          >
-                            <Pencil />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => {
+                                setEditId(customer.id);
+                                setFormOpen(true);
+                              }}
+                            >
+                              <Pencil />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={
+                                (customer._count?.shipments ?? 0) > 0 || deletingId === customer.id
+                              }
+                              title={
+                                (customer._count?.shipments ?? 0) > 0
+                                  ? "Cannot delete a customer with shipments"
+                                  : "Delete customer"
+                              }
+                              onClick={() => handleDelete(customer)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
