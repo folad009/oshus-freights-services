@@ -23,6 +23,53 @@ export function defaultContainerType(shipmentType: ShipmentTypeValue): Container
   return "CONTAINER_40FT";
 }
 
+export type PackageInputMode = "weight" | "dimensions";
+
+export function inferPackageInputMode(shipment?: {
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+}): PackageInputMode {
+  if (shipment?.lengthCm && shipment?.widthCm && shipment?.heightCm) {
+    return "dimensions";
+  }
+  return "weight";
+}
+
+export function buildShipmentPackagePayload(
+  values: {
+    weight?: number;
+    lengthCm?: number | null;
+    widthCm?: number | null;
+    heightCm?: number | null;
+    packageCount?: number;
+  },
+  mode: PackageInputMode
+) {
+  if (mode === "dimensions") {
+    return {
+      weight: calculateVolumetricWeightKg({
+        lengthCm: Number(values.lengthCm),
+        widthCm: Number(values.widthCm),
+        heightCm: Number(values.heightCm),
+        packageCount: values.packageCount ?? 1,
+      }),
+      lengthCm: Number(values.lengthCm),
+      widthCm: Number(values.widthCm),
+      heightCm: Number(values.heightCm),
+      packageCount: values.packageCount ?? 1,
+    };
+  }
+
+  return {
+    weight: Number(values.weight),
+    lengthCm: undefined,
+    widthCm: undefined,
+    heightCm: undefined,
+    packageCount: values.packageCount ?? 1,
+  };
+}
+
 export function calculateVolumetricWeightKg(params: {
   lengthCm: number;
   widthCm: number;

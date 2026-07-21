@@ -22,7 +22,10 @@ import {
 } from "@/lib/billing";
 import { formatCurrency } from "@/lib/helpers";
 import { getShipmentTypeOptions } from "@/lib/shipment-types";
-import { calculateVolumetricWeightKg } from "@/lib/shipment-metrics";
+import {
+  buildShipmentPackagePayload,
+  type PackageInputMode,
+} from "@/lib/shipment-metrics";
 import { submitShipmentIntakeSchema, type SubmitShipmentIntakeInput } from "@/lib/validations";
 import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
 import {
@@ -50,6 +53,7 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
   const [idDocumentNumber, setIdDocumentNumber] = useState("");
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [idDocumentError, setIdDocumentError] = useState("");
+  const [packageInputMode, setPackageInputMode] = useState<PackageInputMode>("dimensions");
 
   const {
     register,
@@ -58,6 +62,7 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     getValues,
     setError,
     clearErrors,
+    resetField,
     formState: { errors },
   } = useForm<SubmitShipmentIntakeInput>({
     defaultValues: {
@@ -142,6 +147,17 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     void loadLink();
   }, [token]);
 
+  function handlePackageInputModeChange(mode: PackageInputMode) {
+    setPackageInputMode(mode);
+    if (mode === "weight") {
+      resetField("lengthCm");
+      resetField("widthCm");
+      resetField("heightCm");
+    } else {
+      resetField("weight");
+    }
+  }
+
   async function handleSubmit() {
     if (isSubmitting) return;
     clearErrors();
@@ -162,16 +178,11 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     }
 
     const values = getValues();
-    const computedWeight = calculateVolumetricWeightKg({
-      lengthCm: Number(values.lengthCm),
-      widthCm: Number(values.widthCm),
-      heightCm: Number(values.heightCm),
-      packageCount: values.packageCount ?? 1,
-    });
+    const packagePayload = buildShipmentPackagePayload(values, packageInputMode);
 
     const parsed = submitShipmentIntakeSchema.safeParse({
       ...values,
-      weight: computedWeight,
+      ...packagePayload,
       notes: values.notes?.trim() || undefined,
       scheduledPickup: values.scheduledPickup?.trim() || undefined,
       pickupAddress: values.pickupAddress?.trim() || undefined,
@@ -362,6 +373,9 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
             widthCm={widthCm}
             heightCm={heightCm}
             packageCount={packageCount}
+            weight={weight}
+            packageInputMode={packageInputMode}
+            onPackageInputModeChange={handlePackageInputModeChange}
             onWeightChange={(value) => setValue("weight", value)}
             showContainerDetails={false}
             idPrefix="intake-"

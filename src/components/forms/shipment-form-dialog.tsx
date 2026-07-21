@@ -35,7 +35,11 @@ import { formatCurrency, SHIPMENT_STATUS_LABELS } from "@/lib/helpers";
 import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
-import { calculateVolumetricWeightKg } from "@/lib/shipment-metrics";
+import {
+  buildShipmentPackagePayload,
+  inferPackageInputMode,
+  type PackageInputMode,
+} from "@/lib/shipment-metrics";
 import {
   PackageMetricsPanel,
   formSelectClass,
@@ -48,13 +52,6 @@ import {
   validateIdDocumentFields,
 } from "@/components/forms/id-document-upload-field";
 import { cn } from "@/lib/utils";
-
-type DimensionErrors = {
-  lengthCm?: { message?: string };
-  widthCm?: { message?: string };
-  heightCm?: { message?: string };
-  packageCount?: { message?: string };
-};
 
 interface ShipmentFormDialogProps {
   open: boolean;
@@ -122,6 +119,7 @@ function ShipmentCreateForm({
     getValues,
     setError,
     clearErrors,
+    resetField,
     formState: { errors },
   } = useForm<CreateShipmentInput>({
     defaultValues: {
@@ -149,6 +147,7 @@ function ShipmentCreateForm({
   const [idDocumentNumber, setIdDocumentNumber] = useState("");
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [idDocumentError, setIdDocumentError] = useState("");
+  const [packageInputMode, setPackageInputMode] = useState<PackageInputMode>("dimensions");
 
   const shipmentType = watch("shipmentType");
   const lengthCm = watch("lengthCm");
@@ -191,6 +190,7 @@ function ShipmentCreateForm({
       setIdDocumentNumber("");
       setIdDocumentFile(null);
       setIdDocumentError("");
+      setPackageInputMode("dimensions");
       reset({
         shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
         weight: undefined,
@@ -222,6 +222,17 @@ function ShipmentCreateForm({
     }
   }, [open, isCustomer, isWarehouseStaff, warehouses, setValue]);
 
+  function handlePackageInputModeChange(mode: PackageInputMode) {
+    setPackageInputMode(mode);
+    if (mode === "weight") {
+      resetField("lengthCm");
+      resetField("widthCm");
+      resetField("heightCm");
+    } else {
+      resetField("weight");
+    }
+  }
+
   async function handleCreateClick() {
     if (isCreating) return;
     clearErrors();
@@ -251,16 +262,11 @@ function ShipmentCreateForm({
       return;
     }
 
-    const weight = calculateVolumetricWeightKg({
-      lengthCm: Number(values.lengthCm),
-      widthCm: Number(values.widthCm),
-      heightCm: Number(values.heightCm),
-      packageCount: values.packageCount ?? 1,
-    });
+    const packagePayload = buildShipmentPackagePayload(values, packageInputMode);
 
     const parsed = createShipmentSchema.safeParse({
       ...values,
-      weight,
+      ...packagePayload,
       customerId: values.customerId?.trim() || undefined,
       warehouseId: values.warehouseId?.trim() || undefined,
       notes: values.notes?.trim() || undefined,
@@ -405,11 +411,14 @@ function ShipmentCreateForm({
         register={register}
         errors={errors}
         shipmentType={shipmentType}
-        lengthCm={lengthCm}
-        widthCm={widthCm}
-        heightCm={heightCm}
+        lengthCm={lengthCm ?? undefined}
+        widthCm={widthCm ?? undefined}
+        heightCm={heightCm ?? undefined}
         packageCount={packageCount}
-        onWeightChange={(weight) => setValue("weight", weight)}
+        weight={weight}
+        packageInputMode={packageInputMode}
+        onPackageInputModeChange={handlePackageInputModeChange}
+        onWeightChange={(nextWeight) => setValue("weight", nextWeight)}
         showContainerDetails={!isCustomer}
       />
 
@@ -626,12 +635,15 @@ function ShipmentEditForm({
     enabled: open && showWarehouseField,
   });
 
+  const [packageInputMode, setPackageInputMode] = useState<PackageInputMode>("dimensions");
+
   const {
     register,
     handleSubmit,
     reset,
     watch,
     setValue,
+    resetField,
     formState: { errors, isSubmitting },
   } = useForm<UpdateShipmentInput>({
     resolver: zodResolver(updateShipmentSchema),
@@ -639,6 +651,7 @@ function ShipmentEditForm({
 
   useEffect(() => {
     if (open && shipment) {
+      setPackageInputMode(inferPackageInputMode(shipment));
       reset({
         shipmentType: shipment.shipmentType,
         weight: shipment.weight,
@@ -666,13 +679,39 @@ function ShipmentEditForm({
   const widthCm = watch("widthCm");
   const heightCm = watch("heightCm");
   const packageCount = watch("packageCount");
+  const weight = watch("weight");
+
+  function handlePackageInputModeChange(mode: PackageInputMode) {
+    setPackageInputMode(mode);
+    if (mode === "weight") {
+      setValue("lengthCm", null);
+      setValue("widthCm", null);
+      setValue("heightCm", null);
+    } else {
+      resetField("weight");
+    }
+  }
 
   async function onSubmit(data: UpdateShipmentInput) {
+    const packagePayload =
+      packageInputMode === "dimensions"
+        ? buildShipmentPackagePayload(data, "dimensions")
+        : {
+            weight: Number(data.weight),
+            lengthCm: null,
+            widthCm: null,
+            heightCm: null,
+            packageCount: data.packageCount ?? 1,
+          };
+
     try {
       const res = await fetch(`/api/shipments/${shipmentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...packagePayload,
+        }),
       });
       const json = await res.json();
       if (!json.success) {
@@ -709,15 +748,17 @@ function ShipmentEditForm({
         register={register as ReturnType<typeof useForm<CreateShipmentInput>>["register"]}
         errors={errors}
         shipmentType={shipmentType}
-        lengthCm={lengthCm}
-        widthCm={widthCm}
-        heightCm={heightCm}
+        lengthCm={lengthCm ?? undefined}
+        widthCm={widthCm ?? undefined}
+        heightCm={heightCm ?? undefined}
         packageCount={packageCount}
-        onWeightChange={(weight) => setValue("weight", weight, { shouldValidate: true })}
+        weight={weight}
+        packageInputMode={packageInputMode}
+        onPackageInputModeChange={handlePackageInputModeChange}
+        onWeightChange={(nextWeight) => setValue("weight", nextWeight, { shouldValidate: true })}
         idPrefix="edit-"
       />
 
-      <input type="hidden" {...register("weight", { valueAsNumber: true })} />
       {errors.weight && <p className="text-sm text-destructive">{errors.weight.message}</p>}
 
       <div className="flex flex-col gap-2">

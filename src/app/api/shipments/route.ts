@@ -117,12 +117,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const cbm = calculateCbm({
-      lengthCm: parsed.data.lengthCm,
-      widthCm: parsed.data.widthCm,
-      heightCm: parsed.data.heightCm,
-      packageCount: parsed.data.packageCount,
-    });
+    const cbm =
+      parsed.data.lengthCm != null &&
+      parsed.data.widthCm != null &&
+      parsed.data.heightCm != null
+        ? calculateCbm({
+            lengthCm: parsed.data.lengthCm,
+            widthCm: parsed.data.widthCm,
+            heightCm: parsed.data.heightCm,
+            packageCount: parsed.data.packageCount,
+          })
+        : null;
 
     const requestPickup = parsed.data.requestPickup ?? false;
     const requestDelivery = parsed.data.requestDelivery ?? false;
@@ -140,9 +145,9 @@ export async function POST(req: NextRequest) {
         customerId,
         shipmentType: parsed.data.shipmentType,
         weight: parsed.data.weight,
-        lengthCm: parsed.data.lengthCm,
-        widthCm: parsed.data.widthCm,
-        heightCm: parsed.data.heightCm,
+        lengthCm: parsed.data.lengthCm ?? null,
+        widthCm: parsed.data.widthCm ?? null,
+        heightCm: parsed.data.heightCm ?? null,
         packageCount: parsed.data.packageCount ?? 1,
         cbm,
         origin: parsed.data.origin,

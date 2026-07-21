@@ -125,27 +125,87 @@ const shipmentServiceRefinement = (
   }
 };
 
-const shipmentCoreFieldsSchema = z.object({
-  shipmentType: z.nativeEnum(ShipmentType),
-  weight: z.number({ message: "Weight is required" }).positive("Weight must be greater than 0"),
-  lengthCm: z.number({ message: "Length is required" }).positive("Length must be greater than 0"),
-  widthCm: z.number({ message: "Width is required" }).positive("Width must be greater than 0"),
-  heightCm: z.number({ message: "Height is required" }).positive("Height must be greater than 0"),
-  packageCount: z
-    .number({ message: "Package count is required" })
-    .int("Package count must be a whole number")
-    .positive("Package count must be at least 1"),
-  origin: z.string().min(1, "Origin is required"),
-  destination: z.string().min(1, "Destination is required"),
-  scheduledPickup: z.string().optional(),
-  notes: z.string().optional(),
-  requestPickup: z.boolean().optional(),
-  requestDelivery: z.boolean().optional(),
-  pickupAddress: z.string().optional(),
-  deliveryAddress: z.string().optional(),
-  hasInsurance: z.boolean().optional(),
-  declaredValue: z.number().positive("Declared value must be greater than 0").optional(),
-});
+const shipmentPackageRefinement = (
+  data: {
+    weight?: number;
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+  },
+  ctx: z.RefinementCtx
+) => {
+  const hasLength = data.lengthCm != null && !Number.isNaN(data.lengthCm);
+  const hasWidth = data.widthCm != null && !Number.isNaN(data.widthCm);
+  const hasHeight = data.heightCm != null && !Number.isNaN(data.heightCm);
+  const dimensionFields = [hasLength, hasWidth, hasHeight];
+  const dimensionCount = dimensionFields.filter(Boolean).length;
+
+  if (dimensionCount === 3) {
+    if (data.lengthCm! <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Length must be greater than 0",
+        path: ["lengthCm"],
+      });
+    }
+    if (data.widthCm! <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Width must be greater than 0",
+        path: ["widthCm"],
+      });
+    }
+    if (data.heightCm! <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Height must be greater than 0",
+        path: ["heightCm"],
+      });
+    }
+    return;
+  }
+
+  if (dimensionCount > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter length, width, and height, or switch to weight only",
+      path: ["lengthCm"],
+    });
+    return;
+  }
+
+  if (data.weight == null || Number.isNaN(data.weight) || data.weight <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Weight must be greater than 0",
+      path: ["weight"],
+    });
+  }
+};
+
+const shipmentCoreFieldsSchema = z
+  .object({
+    shipmentType: z.nativeEnum(ShipmentType),
+    weight: z.number({ message: "Weight is required" }).positive("Weight must be greater than 0"),
+    lengthCm: z.number().positive("Length must be greater than 0").optional(),
+    widthCm: z.number().positive("Width must be greater than 0").optional(),
+    heightCm: z.number().positive("Height must be greater than 0").optional(),
+    packageCount: z
+      .number({ message: "Package count is required" })
+      .int("Package count must be a whole number")
+      .positive("Package count must be at least 1"),
+    origin: z.string().min(1, "Origin is required"),
+    destination: z.string().min(1, "Destination is required"),
+    scheduledPickup: z.string().optional(),
+    notes: z.string().optional(),
+    requestPickup: z.boolean().optional(),
+    requestDelivery: z.boolean().optional(),
+    pickupAddress: z.string().optional(),
+    deliveryAddress: z.string().optional(),
+    hasInsurance: z.boolean().optional(),
+    declaredValue: z.number().positive("Declared value must be greater than 0").optional(),
+  })
+  .superRefine(shipmentPackageRefinement);
 
 export const createShipmentSchema = shipmentCoreFieldsSchema
   .extend({
@@ -161,9 +221,9 @@ export const createShipmentSchema = shipmentCoreFieldsSchema
 export const updateShipmentSchema = z.object({
   shipmentType: z.nativeEnum(ShipmentType).optional(),
   weight: z.number().positive().optional(),
-  lengthCm: z.number().positive().optional(),
-  widthCm: z.number().positive().optional(),
-  heightCm: z.number().positive().optional(),
+  lengthCm: z.number().positive().optional().nullable(),
+  widthCm: z.number().positive().optional().nullable(),
+  heightCm: z.number().positive().optional().nullable(),
   packageCount: z.number().int().positive().optional(),
   origin: z.string().min(1).optional(),
   destination: z.string().min(1).optional(),

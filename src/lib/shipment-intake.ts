@@ -93,12 +93,15 @@ export async function submitShipmentIntake(token: string, data: SubmitShipmentIn
   const insuranceCost =
     hasInsurance && data.declaredValue ? calculateInsuranceCost(data.declaredValue) : null;
 
-  const cbm = calculateCbm({
-    lengthCm: data.lengthCm,
-    widthCm: data.widthCm,
-    heightCm: data.heightCm,
-    packageCount: data.packageCount,
-  });
+  const cbm =
+    data.lengthCm != null && data.widthCm != null && data.heightCm != null
+      ? calculateCbm({
+          lengthCm: data.lengthCm,
+          widthCm: data.widthCm,
+          heightCm: data.heightCm,
+          packageCount: data.packageCount,
+        })
+      : null;
 
   const result = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -128,9 +131,9 @@ export async function submitShipmentIntake(token: string, data: SubmitShipmentIn
         customerId: customer.id,
         shipmentType: data.shipmentType,
         weight: data.weight,
-        lengthCm: data.lengthCm,
-        widthCm: data.widthCm,
-        heightCm: data.heightCm,
+        lengthCm: data.lengthCm ?? null,
+        widthCm: data.widthCm ?? null,
+        heightCm: data.heightCm ?? null,
         packageCount: data.packageCount ?? 1,
         cbm,
         origin: data.origin,

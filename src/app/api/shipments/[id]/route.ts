@@ -106,7 +106,7 @@ export async function PATCH(
       heightCm !== undefined ||
       packageCount !== undefined;
 
-    let cbm: number | undefined;
+    let cbm: number | null | undefined;
     if (
       dimensionUpdate &&
       mergedLength != null &&
@@ -119,6 +119,12 @@ export async function PATCH(
         heightCm: mergedHeight,
         packageCount: mergedPackageCount,
       });
+    } else if (
+      lengthCm === null ||
+      widthCm === null ||
+      heightCm === null
+    ) {
+      cbm = null;
     }
 
     const isAssigning =

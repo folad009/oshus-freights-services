@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Oshus Freight Services — Logistics Management System",
   description: "Enterprise logistics management platform for shipments, inventory, fleet, and billing.",
+  icons: {
+    icon: "/favicon-oshus.png",
+    shortcut: "/favicon-oshus.png",
+    apple: "/favicon-oshus.png",
+  },
 };
 
 export default function RootLayout({
