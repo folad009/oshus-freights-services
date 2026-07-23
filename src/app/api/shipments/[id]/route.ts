@@ -294,16 +294,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthContext("shipments:write");
-    const { id } = await params;
-
-    if (user.role === UserRole.CUSTOMER) {
-      return errorResponse("Customers cannot delete shipments", 403);
+    const user = await getAuthContext("shipments:read");
+    if (user.role !== UserRole.ADMIN) {
+      return errorResponse("Only administrators can delete shipments", 403);
     }
+
+    const { id } = await params;
 
     const existing = await db.shipment.findUnique({ where: { id } });
     if (!existing) return errorResponse("Shipment not found", 404);
-    await assertShipmentWarehouseAccess(user, existing);
 
     await db.shipment.delete({ where: { id } });
 
@@ -312,12 +311,12 @@ export async function DELETE(
       action: "DELETE",
       entity: "Shipment",
       entityId: id,
+      details: `Deleted shipment ${existing.trackingNumber}`,
     });
 
     return successResponse({ deleted: true });
   } catch (error) {
     if (error instanceof AuthError) return errorResponse(error.message, error.status);
-    if (error instanceof WarehouseAccessError) return errorResponse(error.message, 403);
     return handleApiError(error);
   }
 }

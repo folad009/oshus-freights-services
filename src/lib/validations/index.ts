@@ -91,6 +91,33 @@ export const updateCustomerSchema = z.object({
   email: z.string().email("Invalid email"),
 });
 
+function emptyNumberToUndefined(value: unknown) {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number" && Number.isNaN(value)) return undefined;
+  return value;
+}
+
+function emptyNumberToUndefinedOrNull(value: unknown) {
+  if (value === null) return null;
+  return emptyNumberToUndefined(value);
+}
+
+const optionalPositiveNumber = z.preprocess(
+  emptyNumberToUndefined,
+  z.number().positive().optional()
+);
+
+const optionalPositiveNullableNumber = z.preprocess(
+  emptyNumberToUndefinedOrNull,
+  z.number().positive().optional().nullable()
+);
+
+const requiredPositiveNumber = (requiredMessage: string, positiveMessage: string) =>
+  z.preprocess(
+    emptyNumberToUndefined,
+    z.number({ message: requiredMessage }).positive(positiveMessage)
+  );
+
 const shipmentServiceRefinement = (
   data: {
     requestPickup?: boolean;
@@ -186,14 +213,17 @@ const shipmentPackageRefinement = (
 const shipmentCoreFieldsSchema = z
   .object({
     shipmentType: z.nativeEnum(ShipmentType),
-    weight: z.number({ message: "Weight is required" }).positive("Weight must be greater than 0"),
-    lengthCm: z.number().positive("Length must be greater than 0").optional(),
-    widthCm: z.number().positive("Width must be greater than 0").optional(),
-    heightCm: z.number().positive("Height must be greater than 0").optional(),
-    packageCount: z
-      .number({ message: "Package count is required" })
-      .int("Package count must be a whole number")
-      .positive("Package count must be at least 1"),
+    weight: requiredPositiveNumber("Weight is required", "Weight must be greater than 0"),
+    lengthCm: optionalPositiveNumber,
+    widthCm: optionalPositiveNumber,
+    heightCm: optionalPositiveNumber,
+    packageCount: z.preprocess(
+      emptyNumberToUndefined,
+      z
+        .number({ message: "Package count is required" })
+        .int("Package count must be a whole number")
+        .positive("Package count must be at least 1")
+    ),
     origin: z.string().min(1, "Origin is required"),
     destination: z.string().min(1, "Destination is required"),
     scheduledPickup: z.string().optional(),
@@ -203,8 +233,8 @@ const shipmentCoreFieldsSchema = z
     pickupAddress: z.string().optional(),
     deliveryAddress: z.string().optional(),
     hasInsurance: z.boolean().optional(),
-    declaredValue: z.number().positive("Declared value must be greater than 0").optional(),
-    cbm: z.number().positive().optional().nullable(),
+    declaredValue: optionalPositiveNumber,
+    cbm: optionalPositiveNullableNumber,
   })
   .superRefine(shipmentPackageRefinement);
 

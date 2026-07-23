@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Plus, Eye, Pencil, Printer, UserRound } from "lucide-react";
+import { Plus, Eye, Pencil, Printer, UserRound, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -43,8 +44,10 @@ export default function ShipmentsPage() {
   const [viewId, setViewId] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
   const [manifestId, setManifestId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const role = session?.user?.role as UserRole | undefined;
+  const isAdmin = role === UserRole.ADMIN;
   const isCustomer = role === UserRole.CUSTOMER;
   const isWarehouseStaff = role === UserRole.WAREHOUSE_STAFF;
   const canRead = role ? hasPermission(role, "shipments:read") : false;
@@ -104,7 +107,30 @@ export default function ShipmentsPage() {
     }
   }
 
-  const showActions = isCustomer || canPrint || canEdit || canAssign;
+  async function handleDelete(shipment: { id: string; trackingNumber: string }) {
+    const confirmed = window.confirm(
+      `Delete shipment ${shipment.trackingNumber}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(shipment.id);
+    try {
+      const res = await fetch(`/api/shipments/${shipment.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to delete shipment");
+        return;
+      }
+      toast.success("Shipment deleted");
+      await handleSuccess();
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const showActions = isCustomer || canPrint || canEdit || canAssign || isAdmin;
 
   return (
     <div className="flex flex-col gap-6">
@@ -268,6 +294,17 @@ export default function ShipmentsPage() {
                                   onClick={() => openEdit(s.id)}
                                 >
                                   <Pencil />
+                                </Button>
+                              )}
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Delete shipment"
+                                  disabled={deletingId === s.id}
+                                  onClick={() => handleDelete(s)}
+                                >
+                                  <Trash2 />
                                 </Button>
                               )}
                             </div>

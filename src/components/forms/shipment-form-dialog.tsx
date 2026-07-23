@@ -277,15 +277,25 @@ function ShipmentCreateForm({
     const mergedNotes = [packagesNote, values.notes?.trim()].filter(Boolean).join("\n\n");
 
     const parsed = createShipmentSchema.safeParse({
-      ...values,
-      ...packagePayload,
-      cbm: packagePayload.cbm,
+      shipmentType: values.shipmentType,
+      origin: values.origin,
+      destination: values.destination,
+      requestPickup: values.requestPickup,
+      requestDelivery: values.requestDelivery,
+      pickupAddress: values.pickupAddress,
+      deliveryAddress: values.deliveryAddress,
+      scheduledPickup: values.scheduledPickup?.trim() || undefined,
+      hasInsurance: values.hasInsurance,
+      declaredValue: values.hasInsurance ? values.declaredValue : undefined,
       customerId: values.customerId?.trim() || undefined,
       warehouseId: values.warehouseId?.trim() || undefined,
       notes: mergedNotes || undefined,
-      scheduledPickup: values.scheduledPickup?.trim() || undefined,
-      pickupAddress: values.pickupAddress?.trim() || undefined,
-      deliveryAddress: values.deliveryAddress?.trim() || undefined,
+      weight: packagePayload.weight,
+      packageCount: packagePayload.packageCount,
+      lengthCm: packagePayload.lengthCm,
+      widthCm: packagePayload.widthCm,
+      heightCm: packagePayload.heightCm,
+      cbm: packagePayload.cbm,
       acceptedTerms: isCustomer ? acceptedTerms : undefined,
     });
 
