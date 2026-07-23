@@ -635,7 +635,13 @@ function ShipmentEditForm({
   onSuccess?: () => void;
 }) {
   const { data: session } = useSession();
-  const canChangeStatus = ["ADMIN", "DISPATCHER", "DRIVER"].includes(session?.user?.role ?? "");
+  const canChangeStatus = [
+    UserRole.ADMIN,
+    UserRole.DISPATCHER,
+    UserRole.DRIVER,
+    UserRole.FRONT_DESK,
+    UserRole.WAREHOUSE_STAFF,
+  ].includes(session?.user?.role as UserRole);
   const role = session?.user?.role as UserRole | undefined;
   const showWarehouseField = canSelectWarehouse(role);
 
