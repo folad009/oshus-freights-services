@@ -36,10 +36,18 @@ import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import { hasPermission } from "@/lib/rbac";
 import { UserRole } from "@/types/enums";
 import {
+  aggregateShipmentPackages,
   buildShipmentPackagePayload,
+  formatShipmentPackagesNote,
   inferPackageInputMode,
   type PackageInputMode,
+  type ShipmentPackageEntry,
+  validateShipmentPackages,
 } from "@/lib/shipment-metrics";
+import {
+  ShipmentPackagesPanel,
+  createShipmentPackageEntry,
+} from "@/components/forms/shipment-packages-panel";
 import {
   PackageMetricsPanel,
   formSelectClass,
@@ -119,7 +127,6 @@ function ShipmentCreateForm({
     getValues,
     setError,
     clearErrors,
-    resetField,
     formState: { errors },
   } = useForm<CreateShipmentInput>({
     defaultValues: {
@@ -147,18 +154,23 @@ function ShipmentCreateForm({
   const [idDocumentNumber, setIdDocumentNumber] = useState("");
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [idDocumentError, setIdDocumentError] = useState("");
-  const [packageInputMode, setPackageInputMode] = useState<PackageInputMode>("dimensions");
+  const [packages, setPackages] = useState<ShipmentPackageEntry[]>([
+    createShipmentPackageEntry("weight"),
+  ]);
+  const [packageErrors, setPackageErrors] = useState<Record<string, string>>({});
 
   const shipmentType = watch("shipmentType");
-  const lengthCm = watch("lengthCm");
-  const widthCm = watch("widthCm");
-  const heightCm = watch("heightCm");
-  const packageCount = watch("packageCount");
   const requestPickup = watch("requestPickup");
   const requestDelivery = watch("requestDelivery");
   const hasInsurance = watch("hasInsurance");
   const declaredValue = watch("declaredValue");
   const weight = watch("weight");
+
+  const aggregatedPackages = useMemo(() => aggregateShipmentPackages(packages), [packages]);
+
+  useEffect(() => {
+    setValue("weight", aggregatedPackages.weight);
+  }, [aggregatedPackages.weight, setValue]);
 
   const shipmentTypeOptions = getShipmentTypeOptions(isCustomer);
 
@@ -190,7 +202,8 @@ function ShipmentCreateForm({
       setIdDocumentNumber("");
       setIdDocumentFile(null);
       setIdDocumentError("");
-      setPackageInputMode("dimensions");
+      setPackages([createShipmentPackageEntry("weight")]);
+      setPackageErrors({});
       reset({
         shipmentType: ShipmentType.STANDARD_AIR_FREIGHT,
         weight: undefined,
@@ -222,17 +235,6 @@ function ShipmentCreateForm({
     }
   }, [open, isCustomer, isWarehouseStaff, warehouses, setValue]);
 
-  function handlePackageInputModeChange(mode: PackageInputMode) {
-    setPackageInputMode(mode);
-    if (mode === "weight") {
-      resetField("lengthCm");
-      resetField("widthCm");
-      resetField("heightCm");
-    } else {
-      resetField("weight");
-    }
-  }
-
   async function handleCreateClick() {
     if (isCreating) return;
     clearErrors();
@@ -262,14 +264,25 @@ function ShipmentCreateForm({
       return;
     }
 
-    const packagePayload = buildShipmentPackagePayload(values, packageInputMode);
+    const packageValidation = validateShipmentPackages(packages);
+    if (packageValidation.message) {
+      setPackageErrors(packageValidation.errors);
+      toast.error(packageValidation.message);
+      return;
+    }
+    setPackageErrors({});
+
+    const packagePayload = aggregateShipmentPackages(packages);
+    const packagesNote = formatShipmentPackagesNote(packages);
+    const mergedNotes = [packagesNote, values.notes?.trim()].filter(Boolean).join("\n\n");
 
     const parsed = createShipmentSchema.safeParse({
       ...values,
       ...packagePayload,
+      cbm: packagePayload.cbm,
       customerId: values.customerId?.trim() || undefined,
       warehouseId: values.warehouseId?.trim() || undefined,
-      notes: values.notes?.trim() || undefined,
+      notes: mergedNotes || undefined,
       scheduledPickup: values.scheduledPickup?.trim() || undefined,
       pickupAddress: values.pickupAddress?.trim() || undefined,
       deliveryAddress: values.deliveryAddress?.trim() || undefined,
@@ -407,19 +420,12 @@ function ShipmentCreateForm({
         </select>
       </div>
 
-      <PackageMetricsPanel
-        register={register}
-        errors={errors}
+      <ShipmentPackagesPanel
+        packages={packages}
+        onChange={setPackages}
         shipmentType={shipmentType}
-        lengthCm={lengthCm ?? undefined}
-        widthCm={widthCm ?? undefined}
-        heightCm={heightCm ?? undefined}
-        packageCount={packageCount}
-        weight={weight}
-        packageInputMode={packageInputMode}
-        onPackageInputModeChange={handlePackageInputModeChange}
-        onWeightChange={(nextWeight) => setValue("weight", nextWeight)}
         showContainerDetails={!isCustomer}
+        errors={packageErrors}
       />
 
       <div className="flex flex-col gap-2">

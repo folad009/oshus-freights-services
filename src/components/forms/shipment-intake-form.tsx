@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
 import {
-  PackageMetricsPanel,
-  formSelectClass,
-} from "@/components/forms/shipment-package-metrics-panel";
+  ShipmentPackagesPanel,
+  createShipmentPackageEntry,
+} from "@/components/forms/shipment-packages-panel";
+import { formSelectClass } from "@/components/forms/shipment-package-metrics-panel";
 import {
   calculateInsuranceCost,
   calculateShipmentInvoiceBreakdown,
@@ -23,8 +24,10 @@ import {
 import { formatCurrency } from "@/lib/helpers";
 import { getShipmentTypeOptions } from "@/lib/shipment-types";
 import {
-  buildShipmentPackagePayload,
-  type PackageInputMode,
+  aggregateShipmentPackages,
+  formatShipmentPackagesNote,
+  type ShipmentPackageEntry,
+  validateShipmentPackages,
 } from "@/lib/shipment-metrics";
 import { submitShipmentIntakeSchema, type SubmitShipmentIntakeInput } from "@/lib/validations";
 import { TermsAcceptanceField } from "@/components/terms-acceptance-field";
@@ -53,7 +56,10 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
   const [idDocumentNumber, setIdDocumentNumber] = useState("");
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
   const [idDocumentError, setIdDocumentError] = useState("");
-  const [packageInputMode, setPackageInputMode] = useState<PackageInputMode>("dimensions");
+  const [packages, setPackages] = useState<ShipmentPackageEntry[]>([
+    createShipmentPackageEntry("weight"),
+  ]);
+  const [packageErrors, setPackageErrors] = useState<Record<string, string>>({});
 
   const {
     register,
@@ -62,7 +68,6 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     getValues,
     setError,
     clearErrors,
-    resetField,
     formState: { errors },
   } = useForm<SubmitShipmentIntakeInput>({
     defaultValues: {
@@ -87,30 +92,28 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
 
   const [
     shipmentType,
-    lengthCm,
-    widthCm,
-    heightCm,
-    packageCount,
     requestPickup,
     requestDelivery,
     hasInsurance,
     declaredValue,
-    weight,
   ] = useWatch({
     control,
     name: [
       "shipmentType",
-      "lengthCm",
-      "widthCm",
-      "heightCm",
-      "packageCount",
       "requestPickup",
       "requestDelivery",
       "hasInsurance",
       "declaredValue",
-      "weight",
     ],
   });
+
+  const aggregatedPackages = useMemo(() => aggregateShipmentPackages(packages), [packages]);
+
+  useEffect(() => {
+    setValue("weight", aggregatedPackages.weight);
+  }, [aggregatedPackages.weight, setValue]);
+
+  const weight = aggregatedPackages.weight;
 
   const shipmentTypeOptions = getShipmentTypeOptions(true);
 
@@ -147,17 +150,6 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     void loadLink();
   }, [token]);
 
-  function handlePackageInputModeChange(mode: PackageInputMode) {
-    setPackageInputMode(mode);
-    if (mode === "weight") {
-      resetField("lengthCm");
-      resetField("widthCm");
-      resetField("heightCm");
-    } else {
-      resetField("weight");
-    }
-  }
-
   async function handleSubmit() {
     if (isSubmitting) return;
     clearErrors();
@@ -178,12 +170,23 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
     }
 
     const values = getValues();
-    const packagePayload = buildShipmentPackagePayload(values, packageInputMode);
+    const packageValidation = validateShipmentPackages(packages);
+    if (packageValidation.message) {
+      setPackageErrors(packageValidation.errors);
+      toast.error(packageValidation.message);
+      return;
+    }
+    setPackageErrors({});
+
+    const packagePayload = aggregateShipmentPackages(packages);
+    const packagesNote = formatShipmentPackagesNote(packages);
+    const mergedNotes = [packagesNote, values.notes?.trim()].filter(Boolean).join("\n\n");
 
     const parsed = submitShipmentIntakeSchema.safeParse({
       ...values,
       ...packagePayload,
-      notes: values.notes?.trim() || undefined,
+      cbm: packagePayload.cbm,
+      notes: mergedNotes || undefined,
       scheduledPickup: values.scheduledPickup?.trim() || undefined,
       pickupAddress: values.pickupAddress?.trim() || undefined,
       deliveryAddress: values.deliveryAddress?.trim() || undefined,
@@ -365,20 +368,12 @@ export function ShipmentIntakeForm({ token }: { token: string }) {
             </select>
           </div>
 
-          <PackageMetricsPanel
-            register={register}
-            errors={errors}
+          <ShipmentPackagesPanel
+            packages={packages}
+            onChange={setPackages}
             shipmentType={shipmentType}
-            lengthCm={lengthCm}
-            widthCm={widthCm}
-            heightCm={heightCm}
-            packageCount={packageCount}
-            weight={weight}
-            packageInputMode={packageInputMode}
-            onPackageInputModeChange={handlePackageInputModeChange}
-            onWeightChange={(value) => setValue("weight", value)}
             showContainerDetails={false}
-            idPrefix="intake-"
+            errors={packageErrors}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">

@@ -118,7 +118,8 @@ export async function POST(req: NextRequest) {
     }
 
     const cbm =
-      parsed.data.lengthCm != null &&
+      parsed.data.cbm ??
+      (parsed.data.lengthCm != null &&
       parsed.data.widthCm != null &&
       parsed.data.heightCm != null
         ? calculateCbm({
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
             heightCm: parsed.data.heightCm,
             packageCount: parsed.data.packageCount,
           })
-        : null;
+        : null);
 
     const requestPickup = parsed.data.requestPickup ?? false;
     const requestDelivery = parsed.data.requestDelivery ?? false;

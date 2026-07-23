@@ -204,6 +204,7 @@ const shipmentCoreFieldsSchema = z
     deliveryAddress: z.string().optional(),
     hasInsurance: z.boolean().optional(),
     declaredValue: z.number().positive("Declared value must be greater than 0").optional(),
+    cbm: z.number().positive().optional().nullable(),
   })
   .superRefine(shipmentPackageRefinement);
 

@@ -141,3 +141,142 @@ export function formatContainerStatus(metrics: ReturnType<typeof analyzePackageM
     metrics.packagesToFill === 1 ? "" : "s"
   } to fill`;
 }
+
+export type ShipmentPackageEntry = {
+  id: string;
+  inputMode: PackageInputMode;
+  weight?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
+  packageCount: number;
+};
+
+export function createShipmentPackageEntry(
+  inputMode: PackageInputMode = "weight"
+): ShipmentPackageEntry {
+  return {
+    id: crypto.randomUUID(),
+    inputMode,
+    packageCount: 1,
+  };
+}
+
+export function resolvePackageEntryWeight(entry: ShipmentPackageEntry): number {
+  if (entry.inputMode === "dimensions") {
+    return calculateVolumetricWeightKg({
+      lengthCm: Number(entry.lengthCm),
+      widthCm: Number(entry.widthCm),
+      heightCm: Number(entry.heightCm),
+      packageCount: entry.packageCount ?? 1,
+    });
+  }
+
+  return Number(entry.weight) || 0;
+}
+
+export function resolvePackageEntryCbm(entry: ShipmentPackageEntry): number | null {
+  if (entry.inputMode !== "dimensions") return null;
+  if (!entry.lengthCm || !entry.widthCm || !entry.heightCm) return null;
+  if (entry.lengthCm <= 0 || entry.widthCm <= 0 || entry.heightCm <= 0) return null;
+
+  return calculateCbm({
+    lengthCm: entry.lengthCm,
+    widthCm: entry.widthCm,
+    heightCm: entry.heightCm,
+    packageCount: entry.packageCount ?? 1,
+  });
+}
+
+export function validateShipmentPackageEntry(entry: ShipmentPackageEntry): string | null {
+  const count = entry.packageCount;
+  if (!count || count < 1 || !Number.isInteger(count)) {
+    return "Package count must be at least 1";
+  }
+
+  if (entry.inputMode === "weight") {
+    if (!entry.weight || entry.weight <= 0) {
+      return "Weight must be greater than 0";
+    }
+    return null;
+  }
+
+  if (!entry.lengthCm || !entry.widthCm || !entry.heightCm) {
+    return "Enter length, width, and height";
+  }
+
+  if (entry.lengthCm <= 0 || entry.widthCm <= 0 || entry.heightCm <= 0) {
+    return "Dimensions must be greater than 0";
+  }
+
+  return null;
+}
+
+export function validateShipmentPackages(entries: ShipmentPackageEntry[]) {
+  const errors: Record<string, string> = {};
+
+  if (entries.length === 0) {
+    return { errors, message: "Add at least one package" };
+  }
+
+  for (const entry of entries) {
+    const message = validateShipmentPackageEntry(entry);
+    if (message) {
+      errors[entry.id] = message;
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { errors, message: "Please complete all package details" };
+  }
+
+  return { errors, message: null };
+}
+
+export function aggregateShipmentPackages(entries: ShipmentPackageEntry[]) {
+  let totalWeight = 0;
+  let totalPackageCount = 0;
+  let totalCbm = 0;
+  let hasCbm = false;
+
+  for (const entry of entries) {
+    totalWeight += resolvePackageEntryWeight(entry);
+    totalPackageCount += entry.packageCount ?? 1;
+    const cbm = resolvePackageEntryCbm(entry);
+    if (cbm != null) {
+      totalCbm += cbm;
+      hasCbm = true;
+    }
+  }
+
+  const singleEntry = entries.length === 1 ? entries[0] : null;
+  const useSingleDimensions =
+    singleEntry?.inputMode === "dimensions" &&
+    singleEntry.lengthCm != null &&
+    singleEntry.widthCm != null &&
+    singleEntry.heightCm != null;
+
+  return {
+    weight: Math.round(totalWeight * 100) / 100,
+    packageCount: totalPackageCount,
+    cbm: hasCbm ? Math.round(totalCbm * 10000) / 10000 : null,
+    lengthCm: useSingleDimensions ? singleEntry.lengthCm : undefined,
+    widthCm: useSingleDimensions ? singleEntry.widthCm : undefined,
+    heightCm: useSingleDimensions ? singleEntry.heightCm : undefined,
+  };
+}
+
+export function formatShipmentPackagesNote(entries: ShipmentPackageEntry[]): string {
+  if (entries.length <= 1) return "";
+
+  return entries
+    .map((entry, index) => {
+      const count = entry.packageCount ?? 1;
+      if (entry.inputMode === "weight") {
+        return `Package ${index + 1}: ${entry.weight} kg (${count} item${count === 1 ? "" : "s"})`;
+      }
+
+      return `Package ${index + 1}: ${entry.lengthCm}×${entry.widthCm}×${entry.heightCm} cm (${count} item${count === 1 ? "" : "s"}, ${resolvePackageEntryWeight(entry)} kg)`;
+    })
+    .join("\n");
+}

@@ -94,14 +94,15 @@ export async function submitShipmentIntake(token: string, data: SubmitShipmentIn
     hasInsurance && data.declaredValue ? calculateInsuranceCost(data.declaredValue) : null;
 
   const cbm =
-    data.lengthCm != null && data.widthCm != null && data.heightCm != null
+    data.cbm ??
+    (data.lengthCm != null && data.widthCm != null && data.heightCm != null
       ? calculateCbm({
           lengthCm: data.lengthCm,
           widthCm: data.widthCm,
           heightCm: data.heightCm,
           packageCount: data.packageCount,
         })
-      : null;
+      : null);
 
   const result = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
