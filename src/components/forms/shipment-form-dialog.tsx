@@ -635,14 +635,13 @@ function ShipmentEditForm({
   onSuccess?: () => void;
 }) {
   const { data: session } = useSession();
-  const canChangeStatus = [
-    UserRole.ADMIN,
-    UserRole.DISPATCHER,
-    UserRole.DRIVER,
-    UserRole.FRONT_DESK,
-    UserRole.WAREHOUSE_STAFF,
-  ].includes(session?.user?.role as UserRole);
   const role = session?.user?.role as UserRole | undefined;
+  const canChangeStatus =
+    role === UserRole.ADMIN ||
+    role === UserRole.DISPATCHER ||
+    role === UserRole.DRIVER ||
+    role === UserRole.FRONT_DESK ||
+    role === UserRole.WAREHOUSE_STAFF;
   const showWarehouseField = canSelectWarehouse(role);
 
   const { data: shipment } = useQuery({
